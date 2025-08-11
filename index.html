@@ -1,55 +1,98 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Football Legends Draft</title>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <style>
-    body { font-family: Arial; background: #111; color: #fff; margin: 0; padding: 0; }
-    #lobby, #game, #results { display: none; padding: 20px; }
-    .player { padding: 6px; border-bottom: 1px solid #444; cursor: pointer; }
-    .player:hover { background: #222; }
-    .selected { background: #008CBA; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Winning Side</title>
+<style>
+  body {
+    background-color: #121212;
+    color: white;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+  }
+  .container {
+    max-width: 900px;
+    margin: auto;
+    padding: 20px;
+  }
+  h1 {
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  .players-list {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+    background: #1f1f1f;
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+  .player {
+    flex: 1;
+    text-align: center;
+  }
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .card {
+    background: #1f1f1f;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.2s ease-in-out;
+  }
+  .card:hover {
+    border-color: yellow;
+  }
+  .selected {
+    border-color: green !important;
+  }
+  .waiting {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  .score {
+    font-size: 0.9em;
+    color: #bbb;
+  }
+</style>
 </head>
 <body>
-
-<div id="lobby">
-  <h1>Lobby</h1>
-  <button id="createGame">Create Game</button>
-  <input type="text" id="gameCodeInput" placeholder="Enter Game Code">
-  <button id="joinGame">Join Game</button>
-  <div id="playerList"></div>
+<div class="container">
+  <h1>Winning Side</h1>
+  <div class="players-list">
+    <div class="player" id="player1-name">Player 1 <span class="score" id="player1-score">(0)</span></div>
+    <div class="player" id="player2-name">Player 2 <span class="score" id="player2-score">(0)</span></div>
+  </div>
+  <div id="status" style="text-align:center; margin-bottom: 10px;"></div>
+  <div class="cards-grid" id="cards-grid"></div>
 </div>
 
-<div id="game">
-  <h2 id="turnInfo"></h2>
-  <div id="pickList"></div>
-  <button id="endTurn" disabled>End Turn</button>
-</div>
-
-<div id="results">
-  <h1>Results</h1>
-  <div id="finalScores"></div>
-</div>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-  // ===== Firebase Setup =====
-   const FIREBASE_ENABLED = true;
-      const FIREBASE_CONFIG = {
-        apiKey: "AIzaSyCtti9Ll57zmSXvG4RofN_yQa7y2uVCGC0",
-        authDomain: "winning-team-6364c.firebaseapp.com",
-        projectId: "winning-team-6364c",
-        storageBucket: "winning-team-6364c.firebasestorage.app",
-        messagingSenderId: "944401986892",
-        appId: "1:944401986892:web:8fad1c4d395acceed50be9",
-        measurementId: "G-B8TT9WKWEX"
-      };
+  // ===== Firebase Setup (unchanged) =====
+  const firebaseConfig = {
+    apiKey: "AIzaSyCtti9Ll57zmSXvG4RofN_yQa7y2uVCGC0",
+    authDomain: "winning-team-6364c.firebaseapp.com",
+    projectId: "winning-team-6364c",
+    storageBucket: "winning-team-6364c.firebasestorage.app",
+    messagingSenderId: "944401986892",
+    appId: "1:944401986892:web:8fad1c4d395acceed50be9",
+    measurementId: "G-B8TT9WKWEX"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
-
-  // ===== Players (retired) =====
-      const ALL_PLAYERS = [
+  // ===== Players List with Ratings =====
+  const ALL_PLAYERS = [
         // GK (16)
         { id: "yashin", name: "Lev Yashin", country: "USSR", position: "GK", rating: 97 },
         { id: "buffon", name: "Gianluigi Buffon", country: "Italy", position: "GK", rating: 94 },
@@ -191,149 +234,92 @@
       ];
 
 
-  // ===== Game Variables =====
-  let gameId = null;
-  let playerId = null;
-  let playerRole = null;
-  let unsubscribeGame = null;
-  let myTeam = [];
+  // ===== Game State =====
+  let playerId = localStorage.getItem("playerId") || `p_${Math.random().toString(36).substr(2, 9)}`;
+  localStorage.setItem("playerId", playerId);
 
-  // ===== DOM Elements =====
-  const lobbyDiv = document.getElementById("lobby");
-  const gameDiv = document.getElementById("game");
-  const resultsDiv = document.getElementById("results");
-  const pickList = document.getElementById("pickList");
-  const turnInfo = document.getElementById("turnInfo");
-  const playerListDiv = document.getElementById("playerList");
+  let roomId = localStorage.getItem("roomId") || null;
+  let isPlayer1 = localStorage.getItem("isPlayer1") === "true";
+  let unsubscribeRoom = null;
 
-  // ===== Create Game =====
-  document.getElementById("createGame").onclick = async () => {
-    playerId = `P${Date.now()}`;
-    const docRef = await db.collection("games").add({
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      players: { [playerId]: { name: "Player 1", team: [], score: 0 } },
-      status: "waiting",
-      turn: playerId
-    });
-    gameId = docRef.id;
-    playerRole = "host";
-    subscribeToGame();
-  };
-
-  // ===== Join Game =====
-  document.getElementById("joinGame").onclick = async () => {
-    const code = document.getElementById("gameCodeInput").value.trim();
-    if (!code) return;
-    const gameRef = db.collection("games").doc(code);
-    const snap = await gameRef.get();
-    if (!snap.exists) return alert("Game not found");
-    playerId = `P${Date.now()}`;
-    await gameRef.update({
-      [`players.${playerId}`]: { name: "Player 2", team: [], score: 0 },
-      status: "active"
-    });
-    gameId = code;
-    playerRole = "guest";
-    subscribeToGame();
-  };
-
-  // ===== Subscribe to Game =====
-  function subscribeToGame() {
-    unsubscribeGame = db.collection("games").doc(gameId).onSnapshot((doc) => {
-      const game = doc.data();
-      if (!game) return;
-
-      // Show player list with scores
-      playerListDiv.innerHTML = Object.values(game.players)
-        .map(p => `${p.name} - Score: ${p.score}`)
-        .join("<br>");
-
-      if (game.status === "waiting") {
-        lobbyDiv.style.display = "block";
-        gameDiv.style.display = "none";
-      } else if (game.status === "active") {
-        lobbyDiv.style.display = "none";
-        gameDiv.style.display = "block";
-        renderGame(game);
-      } else if (game.status === "finished") {
-        lobbyDiv.style.display = "none";
-        gameDiv.style.display = "none";
-        resultsDiv.style.display = "block";
-        renderResults(game);
-      }
+  function renderCards() {
+    const grid = document.getElementById("cards-grid");
+    grid.innerHTML = "";
+    ALL_PLAYERS.forEach(p => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.setAttribute("data-id", p.id);
+      card.innerHTML = `<strong>${p.name}</strong><br>${p.country}<br>(${p.rating})`;
+      card.onclick = () => selectCard(p.id);
+      grid.appendChild(card);
     });
   }
 
-  // ===== Render Game =====
-  function renderGame(game) {
-    const myData = game.players[playerId];
-    const isMyTurn = game.turn === playerId;
-
-    turnInfo.textContent = isMyTurn ? "Your Turn" : "Opponent's Turn";
-    document.getElementById("endTurn").disabled = !isMyTurn || myTeam.length === 0;
-
-    const takenIds = Object.values(game.players).flatMap(p => p.team);
-    const availablePlayers = ALL_PLAYERS.filter(p => !takenIds.includes(p.id));
-
-    pickList.innerHTML = availablePlayers.map(p => `
-      <div class="player" onclick="selectPlayer('${p.id}')" id="p-${p.id}">
-        ${p.name} (${p.position}) - ${p.rating}
-      </div>
-    `).join('');
-  }
-
-  // ===== Select Player =====
-  window.selectPlayer = (id) => {
-    if (!gameId) return;
-    myTeam.push(id);
-    document.getElementById(`p-${id}`).classList.add("selected");
-    document.getElementById("endTurn").disabled = false;
-  };
-
-  // ===== End Turn =====
-  document.getElementById("endTurn").onclick = async () => {
-    const gameRef = db.collection("games").doc(gameId);
-    const snap = await gameRef.get();
-    const game = snap.data();
-    const opponentId = Object.keys(game.players).find(pid => pid !== playerId);
-
-    await gameRef.update({
-      [`players.${playerId}.team`]: firebase.firestore.FieldValue.arrayUnion(...myTeam),
-      turn: opponentId
-    });
-    myTeam = [];
-
-    // End game if all players picked
-    const totalPicked = Object.values(game.players).flatMap(p => p.team).length;
-    if (totalPicked >= ALL_PLAYERS.length) {
-      const scores = {};
-      for (const pid in game.players) {
-        scores[pid] = computeTeamScore(game.players[pid].team);
+  async function joinOrCreateRoom() {
+    if (roomId) {
+      const roomRef = db.collection("rooms").doc(roomId);
+      const roomSnap = await roomRef.get();
+      if (roomSnap.exists) {
+        const room = roomSnap.data();
+        if (room.player1 === playerId) {
+          isPlayer1 = true;
+        } else if (room.player2 === playerId) {
+          isPlayer1 = false;
+        } else if (!room.player1) {
+          await roomRef.update({ player1: playerId });
+          isPlayer1 = true;
+        } else if (!room.player2) {
+          await roomRef.update({ player2: playerId });
+          isPlayer1 = false;
+        }
+        localStorage.setItem("isPlayer1", isPlayer1);
+        listenToRoom(roomRef);
+        return;
       }
-      await gameRef.update({
-        status: "finished",
-        [`players.${Object.keys(game.players)[0]}.score`]: scores[Object.keys(game.players)[0]],
-        [`players.${Object.keys(game.players)[1]}.score`]: scores[Object.keys(game.players)[1]]
-      });
     }
-  };
-
-  // ===== Compute Team Score =====
-  function computeTeamScore(team) {
-    let total = team.reduce((sum, pid) => {
-      const player = ALL_PLAYERS.find(p => p.id === pid);
-      return sum + (player ? player.rating : 0);
-    }, 0);
-    return total + Math.floor(Math.random() * 10); // Small randomness
+    const newRoomRef = db.collection("rooms").doc();
+    await newRoomRef.set({
+      player1: playerId,
+      player2: null,
+      scores: { player1: 0, player2: 0 },
+      selections: {},
+      updated: Date.now()
+    });
+    roomId = newRoomRef.id;
+    localStorage.setItem("roomId", roomId);
+    isPlayer1 = true;
+    localStorage.setItem("isPlayer1", "true");
+    listenToRoom(newRoomRef);
   }
 
-  // ===== Render Results =====
-  function renderResults(game) {
-    const results = Object.values(game.players)
-      .map(p => `${p.name}: ${p.score}`)
-      .join("<br>");
-    document.getElementById("finalScores").innerHTML = results;
+  function listenToRoom(roomRef) {
+    if (unsubscribeRoom) unsubscribeRoom();
+    unsubscribeRoom = roomRef.onSnapshot(doc => {
+      const data = doc.data();
+      if (!data) return;
+      document.getElementById("player1-score").innerText = `(${data.scores.player1})`;
+      document.getElementById("player2-score").innerText = `(${data.scores.player2})`;
+      if (data.selections) {
+        for (const [pid, cid] of Object.entries(data.selections)) {
+          const cardEl = document.querySelector(`[data-id="${cid}"]`);
+          if (cardEl) cardEl.classList.add("selected");
+        }
+      }
+    });
   }
+
+  async function selectCard(cardId) {
+    if (!roomId) return;
+    const roomRef = db.collection("rooms").doc(roomId);
+    const key = isPlayer1 ? "player1" : "player2";
+    await roomRef.update({
+      [`selections.${key}`]: cardId,
+      updated: Date.now()
+    });
+  }
+
+  renderCards();
+  joinOrCreateRoom();
 </script>
 </body>
 </html>
