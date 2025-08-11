@@ -10,6 +10,9 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+      <!-- Firebase (optional, for realtime invites) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   </head>
   <body class="bg-slate-100">
     <div id="root"></div>
@@ -17,20 +20,42 @@
     <script type="text/babel">
       const { useMemo, useState, useEffect } = React;
 
-      // === Brand config ===
+      // === Brand & Realtime Config ===
       const LOGO_URL = "https://dummyimage.com/160x40/059669/ffffff&text=Winning+Side"; // swap with your logo URL
+
+      // Flip to true after you paste your Firebase config below to enable online invites
+      const FIREBASE_ENABLED = true; // set true when configured
+      const FIREBASE_CONFIG = {
+        apiKey: "AIzaSyCtti9Ll57zmSXvG4RofN_yQa7y2uVCGC0",
+        authDomain: "winning-team-6364c.firebaseapp.com",
+        projectId: "winning-team-6364c",
+        storageBucket: "winning-team-6364c.firebasestorage.app",
+        messagingSenderId: "944401986892",
+        appId: "1:944401986892:web:8fad1c4d395acceed50be9",
+        measurementId: "G-B8TT9WKWEX"
+      }; // swap with your logo URL
 
 
       const ALL_PLAYERS = [
-        // GKs
+        // ===== GK (16) =====
         { id: "yashin", name: "Lev Yashin", country: "USSR", position: "GK", rating: 97 },
         { id: "buffon", name: "Gianluigi Buffon", country: "Italy", position: "GK", rating: 94 },
         { id: "casillas", name: "Iker Casillas", country: "Spain", position: "GK", rating: 92 },
         { id: "schmeichel", name: "Peter Schmeichel", country: "Denmark", position: "GK", rating: 93 },
         { id: "maier", name: "Sepp Maier", country: "Germany", position: "GK", rating: 91 },
         { id: "zoff", name: "Dino Zoff", country: "Italy", position: "GK", rating: 92 },
+        { id: "kahn", name: "Oliver Kahn", country: "Germany", position: "GK", rating: 93 },
+        { id: "banks", name: "Gordon Banks", country: "England", position: "GK", rating: 92 },
+        { id: "chilavert", name: "José Luis Chilavert", country: "Paraguay", position: "GK", rating: 89 },
+        { id: "higuita", name: "René Higuita", country: "Colombia", position: "GK", rating: 87 },
+        { id: "vanDerSar", name: "Edwin van der Sar", country: "Netherlands", position: "GK", rating: 91 },
+        { id: "deGeaOld", name: "David de Gea", country: "Spain", position: "GK", rating: 88 },
+        { id: "dasaev", name: "Rinat Dasayev", country: "USSR", position: "GK", rating: 91 },
+        { id: "valdes", name: "Víctor Valdés", country: "Spain", position: "GK", rating: 88 },
+        { id: "seaman", name: "David Seaman", country: "England", position: "GK", rating: 89 },
+        { id: "schwarzer", name: "Mark Schwarzer", country: "Australia", position: "GK", rating: 85 },
 
-        // DEFs
+        // ===== DEF (32) =====
         { id: "maldini", name: "Paolo Maldini", country: "Italy", position: "DEF", rating: 96 },
         { id: "beckenbauer", name: "Franz Beckenbauer", country: "Germany", position: "DEF", rating: 97 },
         { id: "cafu", name: "Cafu", country: "Brazil", position: "DEF", rating: 90 },
@@ -40,8 +65,32 @@
         { id: "puyol", name: "Carles Puyol", country: "Spain", position: "DEF", rating: 91 },
         { id: "baresi", name: "Franco Baresi", country: "Italy", position: "DEF", rating: 95 },
         { id: "montero", name: "Paolo Montero", country: "Uruguay", position: "DEF", rating: 87 },
+        { id: "zanetti", name: "Javier Zanetti", country: "Argentina", position: "DEF", rating: 92 },
+        { id: "lahm", name: "Philipp Lahm", country: "Germany", position: "DEF", rating: 92 },
+        { id: "ramos", name: "Sergio Ramos", country: "Spain", position: "DEF", rating: 92 },
+        { id: "hierro", name: "Fernando Hierro", country: "Spain", position: "DEF", rating: 91 },
+        { id: "cole", name: "Ashley Cole", country: "England", position: "DEF", rating: 90 },
+        { id: "vidic", name: "Nemanja Vidić", country: "Serbia", position: "DEF", rating: 91 },
+        { id: "campbell", name: "Sol Campbell", country: "England", position: "DEF", rating: 89 },
+        { id: "desailly", name: "Marcel Desailly", country: "France", position: "DEF", rating: 92 },
+        { id: "moore", name: "Bobby Moore", country: "England", position: "DEF", rating: 95 },
+        { id: "cannavaro", name: "Fabio Cannavaro", country: "Italy", position: "DEF", rating: 94 },
+        { id: "nesta", name: "Alessandro Nesta", country: "Italy", position: "DEF", rating: 93 },
+        { id: "tassotti", name: "Mauro Tassotti", country: "Italy", position: "DEF", rating: 88 },
+        { id: "alba", name: "Jordi Alba", country: "Spain", position: "DEF", rating: 88 },
+        { id: "godin", name: "Diego Godín", country: "Uruguay", position: "DEF", rating: 90 },
+        { id: "ayala", name: "Roberto Ayala", country: "Argentina", position: "DEF", rating: 90 },
+        { id: "brehme", name: "Andreas Brehme", country: "Germany", position: "DEF", rating: 90 },
+        { id: "koeman", name: "Ronald Koeman", country: "Netherlands", position: "DEF", rating: 92 },
+        { id: "stam", name: "Jaap Stam", country: "Netherlands", position: "DEF", rating: 90 },
+        { id: "thuram", name: "Lilian Thuram", country: "France", position: "DEF", rating: 92 },
+        { id: "figueroa", name: "Elias Figueroa", country: "Chile", position: "DEF", rating: 93 },
+        { id: "scirea", name: "Gaetano Scirea", country: "Italy", position: "DEF", rating: 93 },
+        { id: "facchetti", name: "Giacinto Facchetti", country: "Italy", position: "DEF", rating: 93 },
+        { id: "santamaria", name: "José Santamaría", country: "Uruguay", position: "DEF", rating: 92 },
+        { id: "passarella", name: "Daniel Passarella", country: "Argentina", position: "DEF", rating: 94 },
 
-        // MIDs
+        // ===== MID (36) =====
         { id: "zidane", name: "Zinedine Zidane", country: "France", position: "MID", rating: 97 },
         { id: "xavi", name: "Xavi", country: "Spain", position: "MID", rating: 95 },
         { id: "iniesta", name: "Andres Iniesta", country: "Spain", position: "MID", rating: 95 },
@@ -55,8 +104,32 @@
         { id: "riquelme", name: "Juan Román Riquelme", country: "Argentina", position: "MID", rating: 92 },
         { id: "lampard", name: "Frank Lampard", country: "England", position: "MID", rating: 90 },
         { id: "gerrard", name: "Steven Gerrard", country: "England", position: "MID", rating: 91 },
+        { id: "figo", name: "Luís Figo", country: "Portugal", position: "MID", rating: 93 },
+        { id: "modric", name: "Luka Modrić", country: "Croatia", position: "MID", rating: 94 },
+        { id: "busquets", name: "Sergio Busquets", country: "Spain", position: "MID", rating: 92 },
+        { id: "davids", name: "Edgar Davids", country: "Netherlands", position: "MID", rating: 90 },
+        { id: "seedorf", name: "Clarence Seedorf", country: "Netherlands", position: "MID", rating: 92 },
+        { id: "schweinsteiger", name: "Bastian Schweinsteiger", country: "Germany", position: "MID", rating: 90 },
+        { id: "gullit", name: "Ruud Gullit", country: "Netherlands", position: "MID", rating: 93 },
+        { id: "nedved", name: "Pavel Nedvěd", country: "Czech Republic", position: "MID", rating: 93 },
+        { id: "rivaldo", name: "Rivaldo", country: "Brazil", position: "MID", rating: 93 },
+        { id: "dunga", name: "Dunga", country: "Brazil", position: "MID", rating: 90 },
+        { id: "socrates", name: "Sócrates", country: "Brazil", position: "MID", rating: 93 },
+        { id: "totti", name: "Francesco Totti", country: "Italy", position: "MID", rating: 93 },
+        { id: "zico", name: "Zico", country: "Brazil", position: "MID", rating: 95 },
+        { id: "redondo", name: "Fernando Redondo", country: "Argentina", position: "MID", rating: 92 },
+        { id: "makalele", name: "Claude Makélélé", country: "France", position: "MID", rating: 91 },
+        { id: "kante", name: "N'Golo Kanté", country: "France", position: "MID", rating: 91 },
+        { id: "yaya", name: "Yaya Touré", country: "Côte d'Ivoire", position: "MID", rating: 91 },
+        { id: "essien", name: "Michael Essien", country: "Ghana", position: "MID", rating: 89 },
+        { id: "sammer", name: "Matthias Sammer", country: "Germany", position: "MID", rating: 91 },
+        { id: "keane", name: "Roy Keane", country: "Ireland", position: "MID", rating: 90 },
+        { id: "veron", name: "Juan Sebastián Verón", country: "Argentina", position: "MID", rating: 90 },
+        { id: "iniesta10", name: "Hristo Stoichkov (AM)", country: "Bulgaria", position: "MID", rating: 91 },
+        { id: "baggio10", name: "Roberto Baggio (AM)", country: "Italy", position: "MID", rating: 94 },
+        { id: "deco", name: "Deco", country: "Portugal", position: "MID", rating: 90 },
 
-        // FWDs
+        // ===== FWD (40+) =====
         { id: "pele", name: "Pelé", country: "Brazil", position: "FWD", rating: 99 },
         { id: "maradona", name: "Diego Maradona", country: "Argentina", position: "FWD", rating: 99 },
         { id: "ronaldo", name: "Ronaldo Nazário", country: "Brazil", position: "FWD", rating: 97 },
@@ -70,6 +143,38 @@
         { id: "romario", name: "Romário", country: "Brazil", position: "FWD", rating: 95 },
         { id: "baggio", name: "Roberto Baggio", country: "Italy", position: "FWD", rating: 94 },
         { id: "weah", name: "George Weah", country: "Liberia", position: "FWD", rating: 91 },
+        { id: "raul", name: "Raúl", country: "Spain", position: "FWD", rating: 94 },
+        { id: "stoichkov", name: "Hristo Stoichkov", country: "Bulgaria", position: "FWD", rating: 93 },
+        { id: "bergkamp", name: "Dennis Bergkamp", country: "Netherlands", position: "FWD", rating: 93 },
+        { id: "lineker", name: "Gary Lineker", country: "England", position: "FWD", rating: 92 },
+        { id: "rush", name: "Ian Rush", country: "Wales", position: "FWD", rating: 91 },
+        { id: "delpiero", name: "Alessandro Del Piero", country: "Italy", position: "FWD", rating: 93 },
+        { id: "inzaghi", name: "Filippo Inzaghi", country: "Italy", position: "FWD", rating: 89 },
+        { id: "klinsmann", name: "Jürgen Klinsmann", country: "Germany", position: "FWD", rating: 91 },
+        { id: "shearer", name: "Alan Shearer", country: "England", position: "FWD", rating: 94 },
+        { id: "fowler", name: "Robbie Fowler", country: "England", position: "FWD", rating: 89 },
+        { id: "owen", name: "Michael Owen", country: "England", position: "FWD", rating: 90 },
+        { id: "etoo", name: "Samuel Eto'o", country: "Cameroon", position: "FWD", rating: 93 },
+        { id: "zlatan", name: "Zlatan Ibrahimović", country: "Sweden", position: "FWD", rating: 92 },
+        { id: "ronaldinhoF", name: "Ronaldinho (FWD)", country: "Brazil", position: "FWD", rating: 94 },
+        { id: "rivaldoF", name: "Rivaldo (FWD)", country: "Brazil", position: "FWD", rating: 93 },
+        { id: "klose", name: "Miroslav Klose", country: "Germany", position: "FWD", rating: 91 },
+        { id: "crespo", name: "Hernán Crespo", country: "Argentina", position: "FWD", rating: 91 },
+        { id: "aguero", name: "Sergio Agüero", country: "Argentina", position: "FWD", rating: 92 },
+        { id: "torres", name: "Fernando Torres", country: "Spain", position: "FWD", rating: 90 },
+        { id: "villa", name: "David Villa", country: "Spain", position: "FWD", rating: 91 },
+        { id: "papin", name: "Jean-Pierre Papin", country: "France", position: "FWD", rating: 90 },
+        { id: "sanchez", name: "Hugo Sánchez", country: "Mexico", position: "FWD", rating: 94 },
+        { id: "rummenigge", name: "Karl-Heinz Rummenigge", country: "Germany", position: "FWD", rating: 94 },
+        { id: "cantona", name: "Eric Cantona", country: "France", position: "FWD", rating: 92 },
+        { id: "rossi", name: "Paolo Rossi", country: "Italy", position: "FWD", rating: 92 },
+        { id: "ginola", name: "David Ginola", country: "France", position: "FWD", rating: 88 },
+        { id: "litmanen", name: "Jari Litmanen", country: "Finland", position: "FWD", rating: 89 },
+        { id: "suker", name: "Davor Šuker", country: "Croatia", position: "FWD", rating: 92 },
+        { id: "rooney", name: "Wayne Rooney", country: "England", position: "FWD", rating: 92 },
+        { id: "dalglish", name: "Kenny Dalglish", country: "Scotland", position: "FWD", rating: 93 },
+        { id: "law", name: "Denis Law", country: "Scotland", position: "FWD", rating: 92 },
+        { id: "greaves", name: "Jimmy Greaves", country: "England", position: "FWD", rating: 94 }
       ];
 
       const POS_LIMITS = { GK: 1, DEF: 1, MID: 2, FWD: 2 };
@@ -153,6 +258,20 @@
       const Divider = () => <div className="h-px bg-gray-200 my-4" />;
 
       function App() {
+        // === Realtime (optional) ===
+        let db = null;
+        const roomFromUrl = new URLSearchParams(window.location.search).get('room') || null;
+        const [roomId, setRoomId] = useState(roomFromUrl);
+        const [isOnline, setIsOnline] = useState(false);
+        const [role, setRole] = useState(null); // 'p1' or 'p2' when online
+
+        useEffect(() => {
+          if (FIREBASE_ENABLED) {
+            if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+            db = firebase.firestore();
+            if (roomFromUrl) { setIsOnline(true); setRole('p2'); }
+          }
+        }, []);
         const [players] = useState(ALL_PLAYERS);
         const [countries] = useState(getCountriesFrom(players));
 
@@ -237,16 +356,70 @@
         const gameOver = winner !== null;
 
         return (
-          <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-8">
+          // ===== Invite helpers (online) =====
+        async function createRoom() {
+          if (!FIREBASE_ENABLED) { alert('Enable Firebase config first.'); return; }
+          const id = Math.random().toString(36).slice(2, 8);
+          await firebase.firestore().collection('matches').doc(id).set({ state: null, updatedAt: Date.now() });
+          setRoomId(id);
+          setRole('p1');
+          setIsOnline(true);
+          const link = window.location.origin + window.location.pathname + `?room=${id}`;
+          navigator.clipboard?.writeText(link);
+          alert('Invite link copied to clipboard!');
+        }
+
+        function inviteFlow() {
+          if (roomId) {
+            const link = window.location.origin + window.location.pathname + `?room=${roomId}`;
+            navigator.clipboard?.writeText(link);
+            alert('Invite link copied!');
+          } else {
+            createRoom();
+          }
+        }
+
+        // Sync state online (very simple last-write-wins)
+        async function syncOnline(state) {
+          if (!FIREBASE_ENABLED || !roomId) return;
+          await firebase.firestore().collection('matches').doc(roomId).set({ state, updatedAt: Date.now() }, { merge: true });
+        }
+
+        // Listen for remote updates if joined as p2 or when online
+        useEffect(() => {
+          if (!FIREBASE_ENABLED || !roomId) return;
+          const ref = firebase.firestore().collection('matches').doc(roomId);
+          const unsub = ref.onSnapshot((snap) => {
+            const data = snap.data();
+            if (!data || !data.state) return;
+            const s = data.state;
+            setTeam1(s.team1); setTeam2(s.team2); setPickedIds(new Set(s.pickedIds));
+            setFirstPicker(s.firstPicker); setTurn(s.turn); setCurrentCountry(s.currentCountry);
+            setWinner(s.winner); setScores(s.scores);
+          });
+          return () => unsub();
+        }, [roomId]);
+
+        // After local state changes, push online
+        useEffect(() => {
+          if (!FIREBASE_ENABLED || !roomId) return;
+          const snapshot = { team1, team2, pickedIds: Array.from(pickedIds), firstPicker, turn, currentCountry, winner, scores };
+          syncOnline(snapshot);
+        }, [team1, team2, pickedIds, firstPicker, turn, currentCountry, winner, scores, roomId]);
+
+        return (<div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-8">
             <div className="max-w-6xl mx-auto">
               <header className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <img src={LOGO_URL} alt="Winning Side" className="h-8 w-auto rounded" />
                   <h1 className="text-2xl md:text-3xl font-bold text-emerald-700">Winning Side — Prototype</h1>
                 </div>
-                <button onClick={newMatch} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm shadow">
-                  New Match
-                </button>
+                <div className="flex items-center gap-2">
+                  <button id="inviteBtn" className="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm" onClick={inviteFlow}>Invite</button>
+                  <button onClick={newMatch} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm shadow">
+                    New Match
+                  </button>
+                </div>
               </header>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
