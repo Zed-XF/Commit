@@ -36,16 +36,17 @@
 
 <script>
   // ===== Firebase Setup =====
-  const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
+   const FIREBASE_ENABLED = true;
+      const FIREBASE_CONFIG = {
+        apiKey: "AIzaSyCtti9Ll57zmSXvG4RofN_yQa7y2uVCGC0",
+        authDomain: "winning-team-6364c.firebaseapp.com",
+        projectId: "winning-team-6364c",
+        storageBucket: "winning-team-6364c.firebasestorage.app",
+        messagingSenderId: "944401986892",
+        appId: "1:944401986892:web:8fad1c4d395acceed50be9",
+        measurementId: "G-B8TT9WKWEX"
+      };
+
 
   // ===== Players (retired) =====
       const ALL_PLAYERS = [
