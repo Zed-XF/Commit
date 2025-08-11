@@ -339,6 +339,7 @@
           const updated = { ...t, skipsLeft: t.skipsLeft - 1 };
           setCurrentTeam(turn, updated);
           rollCountry(turn, currentCountry);
+          setTimeout(publish, 0);
         }
 
         // Picking
@@ -368,12 +369,31 @@
           setTurn(nextTurn);
           setTimeout(() => rollCountry(nextTurn), 50);
         }
+        // after setTurn(nextTurn); and setTimeout(() => rollCountry(nextTurn), 50);
+          setTimeout(publish, 0);
 
         // Eligible list
         const eligibleList = useMemo(() => {
           if (!currentCountry) return [];
           return eligiblePlayersForTeam(players, currentCountry, currentTeamRef(turn), pickedIds);
         }, [players, currentCountry, team1, team2, pickedIds, turn]);
+
+        let lastWriteAt = 0;
+        function publish() {
+          if (!FIREBASE_ENABLED || !roomId) return;
+          if (role !== 'p1') return; // host-only writes
+          const now = Date.now();
+          if (now - lastWriteAt < 250) return; // throttle
+          lastWriteAt = now;
+          const snapshot = {
+            team1, team2,
+            pickedIds: Array.from(pickedIds),
+            firstPicker, turn, currentCountry, winner, scores
+          };
+          firebase.firestore().collection('matches').doc(roomId)
+            .set({ state: snapshot, updatedAt: now }, { merge: true });
+        }
+
 
         // ----- Online: create / invite / sync -----
         async function createRoom() {
@@ -386,6 +406,7 @@
           history.replaceState(null, "", `?room=${id}`); // keep URL
           // host starts a fresh match and syncs
           startFreshMatch();
+          setTimeout(publish, 0);
           const link = window.location.origin + window.location.pathname + `?room=${id}`;
           navigator.clipboard?.writeText(link);
           alert('Invite link copied to clipboard!');
@@ -423,18 +444,6 @@
           return () => unsub();
         }, [roomId]);
 
-        // Push local changes online (P2 waits for first remote to avoid overwriting)
-        useEffect(() => {
-          if (!FIREBASE_ENABLED || !roomId) return;
-          if (role === 'p2' && !receivedRemote) return;
-          const snapshot = {
-            team1, team2,
-            pickedIds: Array.from(pickedIds),
-            firstPicker, turn, currentCountry, winner, scores
-          };
-          syncOnline(snapshot);
-        }, [team1, team2, pickedIds, firstPicker, turn, currentCountry, winner, scores, roomId, role, receivedRemote]);
-
         // New Match: only host (P1) controls in online mode; anyone offline can use it
         function newMatch() {
           if (isOnline && role !== 'p1') {
@@ -442,6 +451,8 @@
             return;
           }
           startFreshMatch(); // host will auto-sync via effect
+          setTimeout(publish, 0);
+
         }
 
         const gameOver = winner !== null;
@@ -566,3 +577,4 @@
     </script>
   </body>
 </html>
+
