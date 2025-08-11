@@ -1,588 +1,483 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Winning Side</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Winning Side — Local Draft</title>
 <style>
-  :root {
-    --bg: #121212;
-    --panel: #1f1f1f;
-    --text: #ffffff;
-    --muted: #bbbbbb;
-    --border: #333;
-    --accent: #ffd60a;
-    --ok: #22c55e;
-  }
-  * { box-sizing: border-box; }
-  body {
-    background-color: var(--bg);
-    color: var(--text);
-    font-family: Arial, sans-serif;
-    margin: 0;
-  }
-  .container {
-    max-width: 960px;
-    margin: 0 auto;
-    padding: 18px 16px 40px;
-  }
-  h1 { text-align: center; margin: 10px 0 12px; }
-  .toolbar {
-    display: flex; flex-wrap: wrap; gap: 8px;
-    justify-content: center; margin: 8px 0 14px;
-  }
-  button {
-    background: #2b2b2b; color: #fff; border: 1px solid var(--border);
-    padding: 8px 12px; border-radius: 6px; cursor: pointer;
-  }
-  button:hover { background: #333; }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  .players-list {
-    display: flex; justify-content: space-between; gap: 8px;
-    padding: 10px; background: var(--panel); border-radius: 8px; margin-bottom: 10px;
-  }
-  .player { flex: 1; text-align: center; }
-  .score { font-size: 0.9em; color: var(--muted); }
-  #status { text-align:center; margin: 10px 0 12px; color: var(--muted); }
-
-  .cards-grid {
-    display: grid; gap: 10px;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  }
-  .card {
-    background: var(--panel);
-    padding: 10px; border-radius: 8px; cursor: pointer;
-    border: 2px solid transparent; transition: border-color 0.15s;
-  }
-  .card:hover { border-color: var(--accent); }
-  .card.selected { border-color: var(--ok) !important; }
-  .card.disabled { opacity:.5; pointer-events:none; }
-  .muted { color: var(--muted); }
+  :root{--bg:#121212;--panel:#1f1f1f;--muted:#bbb;--accent:#ffd54a;--ok:#31d0aa;--warn:#ffb74d;--border:#2a2a2a;}
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:#fff;font-family:Arial,Helvetica,sans-serif;margin:0}
+  .container{max-width:1100px;margin:auto;padding:20px}
+  h1{margin:8px 0 6px;text-align:center}
+  .topbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:8px 0 16px}
+  .chip{font-size:12px;background:#222;border:1px solid var(--border);padding:6px 10px;border-radius:999px}
+  .btn{border:1px solid var(--border);background:#222;color:#fff;border-radius:10px;padding:8px 12px;cursor:pointer}
+  .btn.primary{background:#2a8f6a}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .board{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
+  .team-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .slot{border:1px dashed #333;border-radius:10px;padding:8px}
+  .slot-title{font-size:11px;color:var(--muted);letter-spacing:.08em}
+  .empty{color:#888;font-style:italic;font-size:13px;margin-top:4px}
+  .picked{font-weight:600}
+  .pickbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:8px}
+  .country{background:#203024;border:1px solid #234; padding:6px 10px;border-radius:999px;color:#9fe4c3;font-size:12px}
+  .list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+  .player{border:1px solid var(--border);background:#1a1a1a;border-radius:10px;padding:10px;cursor:pointer}
+  .player:hover{border-color:var(--accent)}
+  .player.disabled{opacity:.5;pointer-events:none}
+  .muted{color:var(--muted);font-size:12px}
+  .result-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .scorebox{border:1px solid var(--border);border-radius:10px;padding:10px}
+  .scorebox .label{font-size:12px;color:var(--muted)}
+  .winner{font-weight:700;color:var(--ok)}
 </style>
 </head>
 <body>
 <div class="container">
   <h1>Winning Side</h1>
 
-  <div class="toolbar">
-    <button id="createRoomBtn">Create Room</button>
-    <button id="copyInviteBtn" disabled>Copy Invite Link</button>
-    <button id="soloGameBtn">Solo Game</button>
-    <button id="startGameBtn" disabled>Start Game</button>
+  <div class="topbar">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="chip">Six-a-side: 1 GK • 1 DEF • 2 MID • 2 FWD</span>
+      <span class="chip" id="firstPickerChip">First picker: —</span>
+      <span class="chip" id="turnChip">Turn: —</span>
+      <span class="chip" id="countryChip">Country: —</span>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button id="startBtn" class="btn primary">Start Game</button>
+      <button id="skipBtn" class="btn">Use Skip</button>
+      <button id="resetBtn" class="btn">Reset</button>
+    </div>
   </div>
 
-  <div class="players-list">
-    <div class="player" id="player1-name">Player 1 <span class="score" id="player1-score">(0)</span></div>
-    <div class="player" id="player2-name">Player 2 <span class="score" id="player2-score">(0)</span></div>
+  <div class="board">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div><strong>Player 1</strong> <span class="muted">Skips: <span id="p1Skips">1</span></span></div>
+      </div>
+      <div class="team-grid" id="team1Grid"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div><strong>Player 2</strong> <span class="muted">Skips: <span id="p2Skips">1</span></span></div>
+      </div>
+      <div class="team-grid" id="team2Grid"></div>
+    </div>
   </div>
 
-  <div id="status" class="muted">Create/Join a room or start a Solo game.</div>
+  <div class="card">
+    <div class="pickbar">
+      <div><strong>Eligible picks</strong></div>
+      <div class="country" id="countryBadge">—</div>
+      <div class="muted" id="eligNote"></div>
+    </div>
+    <div id="list" class="list"></div>
+    <div class="muted" style="margin-top:8px">Only players from the rolled country, fitting your remaining positions, and not already picked will appear.</div>
+  </div>
 
-  <div class="cards-grid" id="cards-grid"></div>
+  <div id="resultPanel" class="card" style="display:none">
+    <div style="font-size:18px;font-weight:700;margin-bottom:6px">Result</div>
+    <div id="winnerRow" style="margin-bottom:8px"></div>
+    <div class="result-row">
+      <div class="scorebox">
+        <div><strong>Player 1</strong></div>
+        <div class="label">Base: <span id="p1Base">0</span></div>
+        <div class="label">Luck: <span id="p1Luck">0</span></div>
+        <div><strong>Final: <span id="p1Final">0</span></strong></div>
+      </div>
+      <div class="scorebox">
+        <div><strong>Player 2</strong></div>
+        <div class="label">Base: <span id="p2Base">0</span></div>
+        <div class="label">Luck: <span id="p2Luck">0</span></div>
+        <div><strong>Final: <span id="p2Final">0</span></strong></div>
+      </div>
+    </div>
+  </div>
 </div>
-
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
 /* =========================
-   Bootstrap + Firebase
-   ========================= */
-const DEBUG = true;
-const log   = (...a) => DEBUG && console.log(...a);
-const error = (...a) => console.error(...a);
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCtti9Ll57zmSXvG4RofN_yQa7y2uVCGC0",
-  authDomain: "winning-team-6364c.firebaseapp.com",
-  projectId: "winning-team-6364c",
-  storageBucket: "winning-team-6364c.firebasestorage.app",
-  messagingSenderId: "944401986892",
-  appId: "1:944401986892:web:8fad1c4d395acceed50be9",
-  measurementId: "G-B8TT9WKWEX"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-
-log("[BOOT] Script starting…");
-
-/* =========================
-   Hardcoded Players
+   Hardcoded Players (your original list)
    ========================= */
 const ALL_PLAYERS = [
-    // GK (16)
-    { id: "yashin", name: "Lev Yashin", country: "USSR", position: "GK", rating: 97 },
-    { id: "buffon", name: "Gianluigi Buffon", country: "Italy", position: "GK", rating: 94 },
-    { id: "casillas", name: "Iker Casillas", country: "Spain", position: "GK", rating: 92 },
-    { id: "schmeichel", name: "Peter Schmeichel", country: "Denmark", position: "GK", rating: 93 },
-    { id: "maier", name: "Sepp Maier", country: "Germany", position: "GK", rating: 91 },
-    { id: "zoff", name: "Dino Zoff", country: "Italy", position: "GK", rating: 92 },
-    { id: "kahn", name: "Oliver Kahn", country: "Germany", position: "GK", rating: 93 },
-    { id: "banks", name: "Gordon Banks", country: "England", position: "GK", rating: 92 },
-    { id: "chilavert", name: "Jose Luis Chilavert", country: "Paraguay", position: "GK", rating: 89 },
-    { id: "higuita", name: "Rene Higuita", country: "Colombia", position: "GK", rating: 87 },
-    { id: "vanDerSar", name: "Edwin van der Sar", country: "Netherlands", position: "GK", rating: 91 },
-    { id: "deGeaOld", name: "David de Gea", country: "Spain", position: "GK", rating: 88 },
-    { id: "dasaev", name: "Rinat Dasayev", country: "USSR", position: "GK", rating: 91 },
-    { id: "valdes", name: "Victor Valdes", country: "Spain", position: "GK", rating: 88 },
-    { id: "seaman", name: "David Seaman", country: "England", position: "GK", rating: 89 },
-    { id: "schwarzer", name: "Mark Schwarzer", country: "Australia", position: "GK", rating: 85 },
+  // GK (16)
+  { id: "yashin", name: "Lev Yashin", country: "USSR", position: "GK", rating: 97 },
+  { id: "buffon", name: "Gianluigi Buffon", country: "Italy", position: "GK", rating: 94 },
+  { id: "casillas", name: "Iker Casillas", country: "Spain", position: "GK", rating: 92 },
+  { id: "schmeichel", name: "Peter Schmeichel", country: "Denmark", position: "GK", rating: 93 },
+  { id: "maier", name: "Sepp Maier", country: "Germany", position: "GK", rating: 91 },
+  { id: "zoff", name: "Dino Zoff", country: "Italy", position: "GK", rating: 92 },
+  { id: "kahn", name: "Oliver Kahn", country: "Germany", position: "GK", rating: 93 },
+  { id: "banks", name: "Gordon Banks", country: "England", position: "GK", rating: 92 },
+  { id: "chilavert", name: "José Luis Chilavert", country: "Paraguay", position: "GK", rating: 89 },
+  { id: "higuita", name: "René Higuita", country: "Colombia", position: "GK", rating: 87 },
+  { id: "vanDerSar", name: "Edwin van der Sar", country: "Netherlands", position: "GK", rating: 91 },
+  { id: "deGeaOld", name: "David de Gea", country: "Spain", position: "GK", rating: 88 },
+  { id: "dasaev", name: "Rinat Dasayev", country: "USSR", position: "GK", rating: 91 },
+  { id: "valdes", name: "Víctor Valdés", country: "Spain", position: "GK", rating: 88 },
+  { id: "seaman", name: "David Seaman", country: "England", position: "GK", rating: 89 },
+  { id: "schwarzer", name: "Mark Schwarzer", country: "Australia", position: "GK", rating: 85 },
 
-    // DEF (32)
-    { id: "maldini", name: "Paolo Maldini", country: "Italy", position: "DEF", rating: 96 },
-    { id: "beckenbauer", name: "Franz Beckenbauer", country: "Germany", position: "DEF", rating: 97 },
-    { id: "cafu", name: "Cafu", country: "Brazil", position: "DEF", rating: 90 },
-    { id: "carlosalberto", name: "Carlos Alberto", country: "Brazil", position: "DEF", rating: 92 },
-    { id: "robertocarlos", name: "Roberto Carlos", country: "Brazil", position: "DEF", rating: 92 },
-    { id: "ferdinand", name: "Rio Ferdinand", country: "England", position: "DEF", rating: 90 },
-    { id: "puyol", name: "Carles Puyol", country: "Spain", position: "DEF", rating: 91 },
-    { id: "baresi", name: "Franco Baresi", country: "Italy", position: "DEF", rating: 95 },
-    { id: "montero", name: "Paolo Montero", country: "Uruguay", position: "DEF", rating: 87 },
-    { id: "zanetti", name: "Javier Zanetti", country: "Argentina", position: "DEF", rating: 92 },
-    { id: "lahm", name: "Philipp Lahm", country: "Germany", position: "DEF", rating: 92 },
-    { id: "ramos", name: "Sergio Ramos", country: "Spain", position: "DEF", rating: 92 },
-    { id: "hierro", name: "Fernando Hierro", country: "Spain", position: "DEF", rating: 91 },
-    { id: "cole", name: "Ashley Cole", country: "England", position: "DEF", rating: 90 },
-    { id: "vidic", name: "Nemanja Vidic", country: "Serbia", position: "DEF", rating: 91 },
-    { id: "campbell", name: "Sol Campbell", country: "England", position: "DEF", rating: 89 },
-    { id: "desailly", name: "Marcel Desailly", country: "France", position: "DEF", rating: 92 },
-    { id: "moore", name: "Bobby Moore", country: "England", position: "DEF", rating: 95 },
-    { id: "cannavaro", name: "Fabio Cannavaro", country: "Italy", position: "DEF", rating: 94 },
-    { id: "nesta", name: "Alessandro Nesta", country: "Italy", position: "DEF", rating: 93 },
-    { id: "tassotti", name: "Mauro Tassotti", country: "Italy", position: "DEF", rating: 88 },
-    { id: "alba", name: "Jordi Alba", country: "Spain", position: "DEF", rating: 88 },
-    { id: "godin", name: "Diego Godin", country: "Uruguay", position: "DEF", rating: 90 },
-    { id: "ayala", name: "Roberto Ayala", country: "Argentina", position: "DEF", rating: 90 },
-    { id: "brehme", name: "Andreas Brehme", country: "Germany", position: "DEF", rating: 90 },
-    { id: "koeman", name: "Ronald Koeman", country: "Netherlands", position: "DEF", rating: 92 },
-    { id: "stam", name: "Jaap Stam", country: "Netherlands", position: "DEF", rating: 90 },
-    { id: "thuram", name: "Lilian Thuram", country: "France", position: "DEF", rating: 92 },
-    { id: "figueroa", name: "Elias Figueroa", country: "Chile", position: "DEF", rating: 93 },
-    { id: "scirea", name: "Gaetano Scirea", country: "Italy", position: "DEF", rating: 93 },
-    { id: "facchetti", name: "Giacinto Facchetti", country: "Italy", position: "DEF", rating: 93 },
-    { id: "santamaria", name: "Jose Santamaria", country: "Uruguay", position: "DEF", rating: 92 },
-    { id: "passarella", name: "Daniel Passarella", country: "Argentina", position: "DEF", rating: 94 },
+  // DEF (32)
+  { id: "maldini", name: "Paolo Maldini", country: "Italy", position: "DEF", rating: 96 },
+  { id: "beckenbauer", name: "Franz Beckenbauer", country: "Germany", position: "DEF", rating: 97 },
+  { id: "cafu", name: "Cafu", country: "Brazil", position: "DEF", rating: 90 },
+  { id: "carlosalberto", name: "Carlos Alberto", country: "Brazil", position: "DEF", rating: 92 },
+  { id: "robertocarlos", name: "Roberto Carlos", country: "Brazil", position: "DEF", rating: 92 },
+  { id: "ferdinand", name: "Rio Ferdinand", country: "England", position: "DEF", rating: 90 },
+  { id: "puyol", name: "Carles Puyol", country: "Spain", position: "DEF", rating: 91 },
+  { id: "baresi", name: "Franco Baresi", country: "Italy", position: "DEF", rating: 95 },
+  { id: "montero", name: "Paolo Montero", country: "Uruguay", position: "DEF", rating: 87 },
+  { id: "zanetti", name: "Javier Zanetti", country: "Argentina", position: "DEF", rating: 92 },
+  { id: "lahm", name: "Philipp Lahm", country: "Germany", position: "DEF", rating: 92 },
+  { id: "ramos", name: "Sergio Ramos", country: "Spain", position: "DEF", rating: 92 },
+  { id: "hierro", name: "Fernando Hierro", country: "Spain", position: "DEF", rating: 91 },
+  { id: "cole", name: "Ashley Cole", country: "England", position: "DEF", rating: 90 },
+  { id: "vidic", name: "Nemanja Vidić", country: "Serbia", position: "DEF", rating: 91 },
+  { id: "campbell", name: "Sol Campbell", country: "England", position: "DEF", rating: 89 },
+  { id: "desailly", name: "Marcel Desailly", country: "France", position: "DEF", rating: 92 },
+  { id: "moore", name: "Bobby Moore", country: "England", position: "DEF", rating: 95 },
+  { id: "cannavaro", name: "Fabio Cannavaro", country: "Italy", position: "DEF", rating: 94 },
+  { id: "nesta", name: "Alessandro Nesta", country: "Italy", position: "DEF", rating: 93 },
+  { id: "tassotti", name: "Mauro Tassotti", country: "Italy", position: "DEF", rating: 88 },
+  { id: "alba", name: "Jordi Alba", country: "Spain", position: "DEF", rating: 88 },
+  { id: "godin", name: "Diego Godín", country: "Uruguay", position: "DEF", rating: 90 },
+  { id: "ayala", name: "Roberto Ayala", country: "Argentina", position: "DEF", rating: 90 },
+  { id: "brehme", name: "Andreas Brehme", country: "Germany", position: "DEF", rating: 90 },
+  { id: "koeman", name: "Ronald Koeman", country: "Netherlands", position: "DEF", rating: 92 },
+  { id: "stam", name: "Jaap Stam", country: "Netherlands", position: "DEF", rating: 90 },
+  { id: "thuram", name: "Lilian Thuram", country: "France", position: "DEF", rating: 92 },
+  { id: "figueroa", name: "Elias Figueroa", country: "Chile", position: "DEF", rating: 93 },
+  { id: "scirea", name: "Gaetano Scirea", country: "Italy", position: "DEF", rating: 93 },
+  { id: "facchetti", name: "Giacinto Facchetti", country: "Italy", position: "DEF", rating: 93 },
+  { id: "santamaria", name: "José Santamaría", country: "Uruguay", position: "DEF", rating: 92 },
+  { id: "passarella", name: "Daniel Passarella", country: "Argentina", position: "DEF", rating: 94 },
 
-    // MID (36)
-    { id: "zidane", name: "Zinedine Zidane", country: "France", position: "MID", rating: 97 },
-    { id: "xavi", name: "Xavi", country: "Spain", position: "MID", rating: 95 },
-    { id: "iniesta", name: "Andres Iniesta", country: "Spain", position: "MID", rating: 95 },
-    { id: "pirlo", name: "Andrea Pirlo", country: "Italy", position: "MID", rating: 94 },
-    { id: "scholes", name: "Paul Scholes", country: "England", position: "MID", rating: 90 },
-    { id: "beckham", name: "David Beckham", country: "England", position: "MID", rating: 89 },
-    { id: "platini", name: "Michel Platini", country: "France", position: "MID", rating: 95 },
-    { id: "kaka", name: "Kaka", country: "Brazil", position: "MID", rating: 92 },
-    { id: "ronaldinho", name: "Ronaldinho", country: "Brazil", position: "MID", rating: 95 },
-    { id: "matthaus", name: "Lothar Matthaus", country: "Germany", position: "MID", rating: 93 },
-    { id: "riquelme", name: "Juan Roman Riquelme", country: "Argentina", position: "MID", rating: 92 },
-    { id: "lampard", name: "Frank Lampard", country: "England", position: "MID", rating: 90 },
-    { id: "gerrard", name: "Steven Gerrard", country: "England", position: "MID", rating: 91 },
-    { id: "figo", name: "Luis Figo", country: "Portugal", position: "MID", rating: 93 },
-    { id: "modric", name: "Luka Modric", country: "Croatia", position: "MID", rating: 94 },
-    { id: "busquets", name: "Sergio Busquets", country: "Spain", position: "MID", rating: 92 },
-    { id: "davids", name: "Edgar Davids", country: "Netherlands", position: "MID", rating: 90 },
-    { id: "seedorf", name: "Clarence Seedorf", country: "Netherlands", position: "MID", rating: 92 },
-    { id: "schweinsteiger", name: "Bastian Schweinsteiger", country: "Germany", position: "MID", rating: 90 },
-    { id: "gullit", name: "Ruud Gullit", country: "Netherlands", position: "MID", rating: 93 },
-    { id: "nedved", name: "Pavel Nedved", country: "Czech Republic", position: "MID", rating: 93 },
-    { id: "rivaldo", name: "Rivaldo", country: "Brazil", position: "MID", rating: 93 },
-    { id: "dunga", name: "Dunga", country: "Brazil", position: "MID", rating: 90 },
-    { id: "socrates", name: "Socrates", country: "Brazil", position: "MID", rating: 93 },
-    { id: "totti", name: "Francesco Totti", country: "Italy", position: "MID", rating: 93 },
-    { id: "zico", name: "Zico", country: "Brazil", position: "MID", rating: 95 },
-    { id: "redondo", name: "Fernando Redondo", country: "Argentina", position: "MID", rating: 92 },
-    { id: "makelele", name: "Claude Makelele", country: "France", position: "MID", rating: 91 },
-    { id: "kante", name: "N'Golo Kante", country: "France", position: "MID", rating: 91 },
-    { id: "yaya", name: "Yaya Toure", country: "Cote d'Ivoire", position: "MID", rating: 91 },
-    { id: "essien", name: "Michael Essien", country: "Ghana", position: "MID", rating: 89 },
-    { id: "sammer", name: "Matthias Sammer", country: "Germany", position: "MID", rating: 91 },
-    { id: "keane", name: "Roy Keane", country: "Ireland", position: "MID", rating: 90 },
-    { id: "veron", name: "Juan Sebastian Veron", country: "Argentina", position: "MID", rating: 90 },
-    { id: "iniesta10", name: "Hristo Stoichkov (AM)", country: "Bulgaria", position: "MID", rating: 91 },
-    { id: "baggio10", name: "Roberto Baggio (AM)", country: "Italy", position: "MID", rating: 94 },
-    { id: "deco", name: "Deco", country: "Portugal", position: "MID", rating: 90 },
+  // MID (36)
+  { id: "zidane", name: "Zinedine Zidane", country: "France", position: "MID", rating: 97 },
+  { id: "xavi", name: "Xavi", country: "Spain", position: "MID", rating: 95 },
+  { id: "iniesta", name: "Andres Iniesta", country: "Spain", position: "MID", rating: 95 },
+  { id: "pirlo", name: "Andrea Pirlo", country: "Italy", position: "MID", rating: 94 },
+  { id: "scholes", name: "Paul Scholes", country: "England", position: "MID", rating: 90 },
+  { id: "beckham", name: "David Beckham", country: "England", position: "MID", rating: 89 },
+  { id: "platini", name: "Michel Platini", country: "France", position: "MID", rating: 95 },
+  { id: "kaka", name: "Kaká", country: "Brazil", position: "MID", rating: 92 },
+  { id: "ronaldinho", name: "Ronaldinho", country: "Brazil", position: "MID", rating: 95 },
+  { id: "matthaus", name: "Lothar Matthäus", country: "Germany", position: "MID", rating: 93 },
+  { id: "riquelme", name: "Juan Román Riquelme", country: "Argentina", position: "MID", rating: 92 },
+  { id: "lampard", name: "Frank Lampard", country: "England", position: "MID", rating: 90 },
+  { id: "gerrard", name: "Steven Gerrard", country: "England", position: "MID", rating: 91 },
+  { id: "figo", name: "Luís Figo", country: "Portugal", position: "MID", rating: 93 },
+  { id: "modric", name: "Luka Modrić", country: "Croatia", position: "MID", rating: 94 },
+  { id: "busquets", name: "Sergio Busquets", country: "Spain", position: "MID", rating: 92 },
+  { id: "davids", name: "Edgar Davids", country: "Netherlands", position: "MID", rating: 90 },
+  { id: "seedorf", name: "Clarence Seedorf", country: "Netherlands", position: "MID", rating: 92 },
+  { id: "schweinsteiger", name: "Bastian Schweinsteiger", country: "Germany", position: "MID", rating: 90 },
+  { id: "gullit", name: "Ruud Gullit", country: "Netherlands", position: "MID", rating: 93 },
+  { id: "nedved", name: "Pavel Nedvěd", country: "Czech Republic", position: "MID", rating: 93 },
+  { id: "rivaldo", name: "Rivaldo", country: "Brazil", position: "MID", rating: 93 },
+  { id: "dunga", name: "Dunga", country: "Brazil", position: "MID", rating: 90 },
+  { id: "socrates", name: "Sócrates", country: "Brazil", position: "MID", rating: 93 },
+  { id: "totti", name: "Francesco Totti", country: "Italy", position: "MID", rating: 93 },
+  { id: "zico", name: "Zico", country: "Brazil", position: "MID", rating: 95 },
+  { id: "redondo", name: "Fernando Redondo", country: "Argentina", position: "MID", rating: 92 },
+  { id: "makalele", name: "Claude Makélélé", country: "France", position: "MID", rating: 91 },
+  { id: "kante", name: "N'Golo Kanté", country: "France", position: "MID", rating: 91 },
+  { id: "yaya", name: "Yaya Touré", country: "Côte d'Ivoire", position: "MID", rating: 91 },
+  { id: "essien", name: "Michael Essien", country: "Ghana", position: "MID", rating: 89 },
+  { id: "sammer", name: "Matthias Sammer", country: "Germany", position: "MID", rating: 91 },
+  { id: "keane", name: "Roy Keane", country: "Ireland", position: "MID", rating: 90 },
+  { id: "veron", name: "Juan Sebastián Verón", country: "Argentina", position: "MID", rating: 90 },
+  { id: "iniesta10", name: "Hristo Stoichkov (AM)", country: "Bulgaria", position: "MID", rating: 91 },
+  { id: "baggio10", name: "Roberto Baggio (AM)", country: "Italy", position: "MID", rating: 94 },
+  { id: "deco", name: "Deco", country: "Portugal", position: "MID", rating: 90 },
 
-    // FWD (40+)
-    { id: "pele", name: "Pele", country: "Brazil", position: "FWD", rating: 99 },
-    { id: "maradona", name: "Diego Maradona", country: "Argentina", position: "FWD", rating: 99 },
-    { id: "ronaldo", name: "Ronaldo Nazario", country: "Brazil", position: "FWD", rating: 97 },
-    { id: "cruyff", name: "Johan Cruyff", country: "Netherlands", position: "FWD", rating: 97 },
-    { id: "henry", name: "Thierry Henry", country: "France", position: "FWD", rating: 94 },
-    { id: "shevchenko", name: "Andriy Shevchenko", country: "Ukraine", position: "FWD", rating: 92 },
-    { id: "batistuta", name: "Gabriel Batistuta", country: "Argentina", position: "FWD", rating: 94 },
-    { id: "vanbasten", name: "Marco van Basten", country: "Netherlands", position: "FWD", rating: 96 },
-    { id: "eusebio", name: "Eusebio", country: "Portugal", position: "FWD", rating: 95 },
-    { id: "muller", name: "Gerd Muller", country: "Germany", position: "FWD", rating: 96 },
-    { id: "romario", name: "Romario", country: "Brazil", position: "FWD", rating: 95 },
-    { id: "baggio", name: "Roberto Baggio", country: "Italy", position: "FWD", rating: 94 },
-    { id: "weah", name: "George Weah", country: "Liberia", position: "FWD", rating: 91 },
-    { id: "raul", name: "Raul", country: "Spain", position: "FWD", rating: 94 },
-    { id: "stoichkov", name: "Hristo Stoichkov", country: "Bulgaria", position: "FWD", rating: 93 },
-    { id: "bergkamp", name: "Dennis Bergkamp", country: "Netherlands", position: "FWD", rating: 93 },
-    { id: "lineker", name: "Gary Lineker", country: "England", position: "FWD", rating: 92 },
-    { id: "rush", name: "Ian Rush", country: "Wales", position: "FWD", rating: 91 },
-    { id: "delpiero", name: "Alessandro Del Piero", country: "Italy", position: "FWD", rating: 93 },
-    { id: "inzaghi", name: "Filippo Inzaghi", country: "Italy", position: "FWD", rating: 89 },
-    { id: "klinsmann", name: "Jurgen Klinsmann", country: "Germany", position: "FWD", rating: 91 },
-    { id: "shearer", name: "Alan Shearer", country: "England", position: "FWD", rating: 94 },
-    { id: "fowler", name: "Robbie Fowler", country: "England", position: "FWD", rating: 89 },
-    { id: "owen", name: "Michael Owen", country: "England", position: "FWD", rating: 90 },
-    { id: "etoo", name: "Samuel Eto'o", country: "Cameroon", position: "FWD", rating: 93 },
-    { id: "zlatan", name: "Zlatan Ibrahimovic", country: "Sweden", position: "FWD", rating: 92 },
-    { id: "ronaldinhoF", name: "Ronaldinho (FWD)", country: "Brazil", position: "FWD", rating: 94 },
-    { id: "rivaldoF", name: "Rivaldo (FWD)", country: "Brazil", position: "FWD", rating: 93 },
-    { id: "klose", name: "Miroslav Klose", country: "Germany", position: "FWD", rating: 91 },
-    { id: "crespo", name: "Hernan Crespo", country: "Argentina", position: "FWD", rating: 91 },
-    { id: "aguero", name: "Sergio Aguero", country: "Argentina", position: "FWD", rating: 92 },
-    { id: "torres", name: "Fernando Torres", country: "Spain", position: "FWD", rating: 90 },
-    { id: "villa", name: "David Villa", country: "Spain", position: "FWD", rating: 91 },
-    { id: "papin", name: "Jean-Pierre Papin", country: "France", position: "FWD", rating: 90 },
-    { id: "sanchez", name: "Hugo Sanchez", country: "Mexico", position: "FWD", rating: 94 },
-    { id: "rummenigge", name: "Karl-Heinz Rummenigge", country: "Germany", position: "FWD", rating: 94 },
-    { id: "cantona", name: "Eric Cantona", country: "France", position: "FWD", rating: 92 },
-    { id: "rossi", name: "Paolo Rossi", country: "Italy", position: "FWD", rating: 91 },
-    { id: "morientes", name: "Fernando Morientes", country: "Spain", position: "FWD", rating: 89 },
-    { id: "greaves", name: "Jimmy Greaves", country: "England", position: "FWD", rating: 94 }
+  // FWD (40+)
+  { id: "pele", name: "Pelé", country: "Brazil", position: "FWD", rating: 99 },
+  { id: "maradona", name: "Diego Maradona", country: "Argentina", position: "FWD", rating: 99 },
+  { id: "ronaldo", name: "Ronaldo Nazário", country: "Brazil", position: "FWD", rating: 97 },
+  { id: "cruyff", name: "Johan Cruyff", country: "Netherlands", position: "FWD", rating: 97 },
+  { id: "henry", name: "Thierry Henry", country: "France", position: "FWD", rating: 94 },
+  { id: "shevchenko", name: "Andriy Shevchenko", country: "Ukraine", position: "FWD", rating: 92 },
+  { id: "batistuta", name: "Gabriel Batistuta", country: "Argentina", position: "FWD", rating: 94 },
+  { id: "vanbasten", name: "Marco van Basten", country: "Netherlands", position: "FWD", rating: 96 },
+  { id: "eusebio", name: "Eusébio", country: "Portugal", position: "FWD", rating: 95 },
+  { id: "muller", name: "Gerd Müller", country: "Germany", position: "FWD", rating: 96 },
+  { id: "romario", name: "Romário", country: "Brazil", position: "FWD", rating: 95 },
+  { id: "baggio", name: "Roberto Baggio", country: "Italy", position: "FWD", rating: 94 },
+  { id: "weah", name: "George Weah", country: "Liberia", position: "FWD", rating: 91 },
+  { id: "raul", name: "Raúl", country: "Spain", position: "FWD", rating: 94 },
+  { id: "stoichkov", name: "Hristo Stoichkov", country: "Bulgaria", position: "FWD", rating: 93 },
+  { id: "bergkamp", name: "Dennis Bergkamp", country: "Netherlands", position: "FWD", rating: 93 },
+  { id: "lineker", name: "Gary Lineker", country: "England", position: "FWD", rating: 92 },
+  { id: "rush", name: "Ian Rush", country: "Wales", position: "FWD", rating: 91 },
+  { id: "delpiero", name: "Alessandro Del Piero", country: "Italy", position: "FWD", rating: 93 },
+  { id: "inzaghi", name: "Filippo Inzaghi", country: "Italy", position: "FWD", rating: 89 },
+  { id: "klinsmann", name: "Jürgen Klinsmann", country: "Germany", position: "FWD", rating: 91 },
+  { id: "shearer", name: "Alan Shearer", country: "England", position: "FWD", rating: 94 },
+  { id: "fowler", name: "Robbie Fowler", country: "England", position: "FWD", rating: 89 },
+  { id: "owen", name: "Michael Owen", country: "England", position: "FWD", rating: 90 },
+  { id: "etoo", name: "Samuel Eto'o", country: "Cameroon", position: "FWD", rating: 93 },
+  { id: "zlatan", name: "Zlatan Ibrahimović", country: "Sweden", position: "FWD", rating: 92 },
+  { id: "ronaldinhoF", name: "Ronaldinho (FWD)", country: "Brazil", position: "FWD", rating: 94 },
+  { id: "rivaldoF", name: "Rivaldo (FWD)", country: "Brazil", position: "FWD", rating: 93 },
+  { id: "klose", name: "Miroslav Klose", country: "Germany", position: "FWD", rating: 91 },
+  { id: "crespo", name: "Hernán Crespo", country: "Argentina", position: "FWD", rating: 91 },
+  { id: "aguero", name: "Sergio Agüero", country: "Argentina", position: "FWD", rating: 92 },
+  { id: "torres", name: "Fernando Torres", country: "Spain", position: "FWD", rating: 90 },
+  { id: "villa", name: "David Villa", country: "Spain", position: "FWD", rating: 91 },
+  { id: "papin", name: "Jean-Pierre Papin", country: "France", position: "FWD", rating: 90 },
+  { id: "sanchez", name: "Hugo Sánchez", country: "Mexico", position: "FWD", rating: 94 },
+  { id: "rummenigge", name: "Karl-Heinz Rummenigge", country: "Germany", position: "FWD", rating: 94 },
+  { id: "cantona", name: "Eric Cantona", country: "France", position: "FWD", rating: 92 },
+  { id: "rossi", name: "Paolo Rossi", country: "Italy", position: "FWD", rating: 92 },
+  { id: "ginola", name: "David Ginola", country: "France", position: "FWD", rating: 88 },
+  { id: "litmanen", name: "Jari Litmanen", country: "Finland", position: "FWD", rating: 89 },
+  { id: "suker", name: "Davor Šuker", country: "Croatia", position: "FWD", rating: 92 },
+  { id: "rooney", name: "Wayne Rooney", country: "England", position: "FWD", rating: 92 },
+  { id: "dalglish", name: "Kenny Dalglish", country: "Scotland", position: "FWD", rating: 93 },
+  { id: "law", name: "Denis Law", country: "Scotland", position: "FWD", rating: 92 },
+  { id: "greaves", name: "Jimmy Greaves", country: "England", position: "FWD", rating: 94 }
 ];
 
+/* =========================
+   Game Logic
+   ========================= */
+const POS_LIMITS = { GK: 1, DEF: 1, MID: 2, FWD: 2 };
+const ORDER = ["GK", "DEF", "MID", "FWD"];
+const countries = Array.from(new Set(ALL_PLAYERS.map(p => p.country))).sort();
 
-/* Guard: render something even if you forgot to paste players yet */
-if (!Array.isArray(ALL_PLAYERS) || ALL_PLAYERS.length === 0) {
-  document.getElementById("status").textContent = "⚠️ Paste your players list into ALL_PLAYERS in the HTML file.";
+const state = {
+  team1: { GK: [], DEF: [], MID: [], FWD: [], skips: 1 },
+  team2: { GK: [], DEF: [], MID: [], FWD: [], skips: 1 },
+  pickedIds: new Set(),
+  firstPicker: null, // 1 or 2
+  turn: 1,
+  currentCountry: null,
+  lastCountry: { 1: null, 2: null },
+  over: false,
+  scores: null
+};
+
+const els = {
+  firstPickerChip: document.getElementById("firstPickerChip"),
+  turnChip: document.getElementById("turnChip"),
+  countryChip: document.getElementById("countryChip"),
+  countryBadge: document.getElementById("countryBadge"),
+  p1Skips: document.getElementById("p1Skips"),
+  p2Skips: document.getElementById("p2Skips"),
+  team1Grid: document.getElementById("team1Grid"),
+  team2Grid: document.getElementById("team2Grid"),
+  list: document.getElementById("list"),
+  eligNote: document.getElementById("eligNote"),
+  startBtn: document.getElementById("startBtn"),
+  skipBtn: document.getElementById("skipBtn"),
+  resetBtn: document.getElementById("resetBtn"),
+  resultPanel: document.getElementById("resultPanel"),
+  winnerRow: document.getElementById("winnerRow"),
+  p1Base: document.getElementById("p1Base"),
+  p1Luck: document.getElementById("p1Luck"),
+  p1Final: document.getElementById("p1Final"),
+  p2Base: document.getElementById("p2Base"),
+  p2Luck: document.getElementById("p2Luck"),
+  p2Final: document.getElementById("p2Final")
+};
+
+function resetAll() {
+  state.team1 = { GK: [], DEF: [], MID: [], FWD: [], skips: 1 };
+  state.team2 = { GK: [], DEF: [], MID: [], FWD: [], skips: 1 };
+  state.pickedIds = new Set();
+  state.firstPicker = null;
+  state.turn = 1;
+  state.currentCountry = null;
+  state.lastCountry = { 1: null, 2: null };
+  state.over = false;
+  state.scores = null;
+  render();
 }
 
-/* =========================
-   Globals + DOM refs
-   ========================= */
-let playerId  = localStorage.getItem("playerId") || `p_${Math.random().toString(36).slice(2,9)}`;
-localStorage.setItem("playerId", playerId);
-log("[BOOT] playerId:", playerId);
-
-let roomId = localStorage.getItem("roomId") || null;
-let unsubscribeRoom = null;
-
-// role helpers (p1/p2) per room
-const roleKey = (rid) => `ws_role_${rid}`;
-const getRole = (rid) => localStorage.getItem(roleKey(rid));
-const setRole = (rid, r) => localStorage.setItem(roleKey(rid), r);
-
-// local (solo) mode
-let localMode = false;
-let localState = null;
-
-const gridEl   = document.getElementById("cards-grid");
-const statusEl = document.getElementById("status");
-const p1Score  = document.getElementById("player1-score");
-const p2Score  = document.getElementById("player2-score");
-
-let createRoomBtn = document.getElementById("createRoomBtn");
-let copyInviteBtn = document.getElementById("copyInviteBtn");
-let soloGameBtn   = document.getElementById("soloGameBtn");
-let startGameBtn  = document.getElementById("startGameBtn");
-
-/* =========================
-   UI: Cards
-   ========================= */
-function renderCards(selectedIds = new Set(), disabledAll = false) {
-  gridEl.innerHTML = "";
-  ALL_PLAYERS.forEach(p => {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.dataset.id = p.id;
-    if (selectedIds.has(p.id)) card.classList.add("selected");
-    if (disabledAll) card.classList.add("disabled");
-    card.innerHTML = `<strong>${p.name}</strong><br>${p.country}<br>(${p.rating})`;
-    card.onclick = () => onCardClick(p.id);
-    gridEl.appendChild(card);
-  });
+function startGame() {
+  resetAll();
+  state.firstPicker = Math.random() < 0.5 ? 1 : 2;
+  state.turn = state.firstPicker;
+  rollCountry(state.turn);
+  render();
 }
 
-/* =========================
-   Room lifecycle (online)
-   ========================= */
-function roomRef(id) { return db.collection("rooms").doc(id); }
+function needs(team) {
+  const out = {};
+  ORDER.forEach(pos => out[pos] = Math.max(0, POS_LIMITS[pos] - team[pos].length));
+  return out;
+}
+function teamFull(team) { return ORDER.every(pos => team[pos].length === POS_LIMITS[pos]); }
 
-async function createRoom() {
-  try {
-    localMode = false;
-    const ref = db.collection("rooms").doc(); // random id
-    const payload = {
-      player1: playerId,
-      player2: null,
-      status: "waiting",      // waiting | active | finished
-      turn: "p1",             // p1 | p2
-      picks: { p1: [], p2: [] },
-      scores: { player1: 0, player2: 0 },
-      updated: Date.now()
-    };
-    await ref.set(payload);
-    roomId = ref.id;
-    localStorage.setItem("roomId", roomId);
-    setRole(roomId, "p1");
-    copyInviteBtn.disabled = false;
-    startGameBtn.disabled = true; // enabled when p2 joins
-    listenToRoom(ref);
-    statusEl.textContent = "Room created. Share the link and wait for Player 2.";
-    log("[ROOM] created", roomId);
-  } catch (e) {
-    error("[ROOM ERROR] createRoom:", e);
-    alert("Could not create a room. Check Firestore rules.");
+function eligibleFor(country, team, taken) {
+  const n = needs(team);
+  return ALL_PLAYERS.filter(p =>
+    p.country === country && !taken.has(p.id) && n[p.position] > 0
+  );
+}
+
+function rollCountry(forPlayer, avoidSame=true) {
+  const avoid = avoidSame ? state.lastCountry[forPlayer] : null;
+  let candidate = null;
+
+  // try to avoid repeating same country and ensure at least one eligible
+  for (let i=0;i<60;i++){
+    const c = countries[Math.floor(Math.random()*countries.length)];
+    if (avoid && c === avoid) continue;
+    const team = forPlayer === 1 ? state.team1 : state.team2;
+    if (eligibleFor(c, team, state.pickedIds).length) { candidate = c; break; }
   }
-}
-
-function copyInvite() {
-  if (!roomId) return;
-  const link = `${location.origin}${location.pathname}?room=${roomId}`;
-  navigator.clipboard?.writeText(link);
-  alert("Invite link copied:\n" + link);
-}
-
-async function autoAttachOrCreate() {
-  const urlRoom = new URLSearchParams(location.search).get("room");
-  if (urlRoom) {
-    // join as p2 if possible
-    try {
-      const ref = roomRef(urlRoom);
-      const snap = await ref.get();
-      if (!snap.exists) {
-        statusEl.textContent = "Room not found. Create a new one or start Solo.";
-        return;
-      }
-      const s = snap.data();
-      if (!s.player2 && s.player1 !== playerId) {
-        await ref.update({ player2: playerId, updated: Date.now() });
-        setRole(urlRoom, "p2");
-      }
-      roomId = urlRoom;
-      localStorage.setItem("roomId", roomId);
-      copyInviteBtn.disabled = false;
-      listenToRoom(ref);
-      statusEl.textContent = "Joined room. Wait for host to Start Game.";
-      return;
-    } catch (e) {
-      error("[ROOM ERROR] autoAttachOrCreate:", e);
-      statusEl.textContent = "Failed to join room. Check rules or try Solo Game.";
-      return;
+  // fallback any eligible
+  if (!candidate){
+    for (let i=0;i<60;i++){
+      const c = countries[Math.floor(Math.random()*countries.length)];
+      const team = forPlayer === 1 ? state.team1 : state.team2;
+      if (eligibleFor(c, team, state.pickedIds).length) { candidate = c; break; }
     }
   }
+  // last resort: random country (might be empty; UI will say try skip)
+  if (!candidate) candidate = countries[Math.floor(Math.random()*countries.length)];
 
-  // reattach cached room if it still exists
-  if (roomId) {
-    try {
-      const ref = roomRef(roomId);
-      const snap = await ref.get();
-      if (snap.exists) {
-        copyInviteBtn.disabled = false;
-        listenToRoom(ref);
-        statusEl.textContent = "Reconnected to previous room.";
-        return;
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
-
-  // no room → idle
-  renderCards(); // visible UI even without room
+  state.currentCountry = candidate;
+  state.lastCountry[forPlayer] = candidate;
 }
 
-function listenToRoom(ref) {
-  if (unsubscribeRoom) unsubscribeRoom();
-  unsubscribeRoom = ref.onSnapshot(doc => {
-    const s = doc.data();
-    if (!s) return;
+function pickPlayer(p) {
+  if (state.over) return;
+  const team = state.turn === 1 ? state.team1 : state.team2;
+  const elig = eligibleFor(state.currentCountry, team, state.pickedIds).map(x=>x.id);
+  if (!elig.includes(p.id)) return; // guard
 
-    // enable Start when both in and status waiting and we are host
-    const amHost = getRole(roomId) === "p1";
-    const bothHere = !!s.player1 && !!s.player2;
-    startGameBtn.disabled = !(amHost && bothHere && s.status === "waiting");
+  team[p.position].push(p);
+  state.pickedIds.add(p.id);
 
-    // mark selected cards
-    const selected = new Set([...(s.picks?.p1 || []), ...(s.picks?.p2 || [])]);
-    const disabledAll = s.status !== "active";
-    renderCards(selected, disabledAll);
-
-    // scores text
-    p1Score.textContent = `(${s.scores?.player1 ?? 0})`;
-    p2Score.textContent = `(${s.scores?.player2 ?? 0})`;
-
-    // status line
-    statusEl.textContent =
-      s.status === "waiting"  ? (bothHere ? "Both players present. Host can Start Game." : "Waiting for both players…") :
-      s.status === "active"   ? `Active — Turn: ${s.turn.toUpperCase()}` :
-      s.status === "finished" ? `Finished — Winner: ${
-          (s.scores.player1 === s.scores.player2) ? "Tie"
-          : (s.scores.player1 > s.scores.player2 ? "Player 1" : "Player 2")
-        }` : "";
-
-  }, (e) => {
-    error("[ROOM ERROR] snapshot:", e);
-    statusEl.textContent = "Live updates unavailable. Check rules.";
-  });
-}
-
-async function startGame() {
-  if (localMode) {
-    if (!localState || localState.status !== "waiting") return;
-    localState.status = "active";
-    localState.turn = "p1";
-    statusEl.textContent = "Solo — Player 1 to pick.";
-    renderCards(new Set(), false);
-    return;
-  }
-  if (!roomId) return alert("Create or join a room first.");
-  try {
-    const ref = roomRef(roomId);
-    const snap = await ref.get();
-    const s = snap.data();
-    const iAmHost = getRole(roomId) === "p1";
-    const bothHere = !!s.player1 && !!s.player2;
-    if (!iAmHost) return alert("Only Player 1 can start.");
-    if (!bothHere) return alert("Wait for Player 2 to join.");
-    if (s.status !== "waiting") return;
-
-    await ref.update({ status: "active", turn: "p1", updated: Date.now() });
-    statusEl.textContent = "Game started. Player 1 to pick.";
-  } catch (e) {
-    error("[ROOM ERROR] startGame:", e);
-    alert("Could not start game. Check rules.");
-  }
-}
-
-/* =========================
-   Solo mode (local)
-   ========================= */
-function bootSoloGame() {
-  localMode = true;
-  roomId = "local";
-  localStorage.setItem("roomId", roomId);
-  setRole(roomId, "p1"); // one device, you control both
-
-  localState = {
-    status: "waiting",
-    picks: { p1: [], p2: [] },
-    scores: { player1: 0, player2: 0 },
-    turn: "p1"
-  };
-  if (unsubscribeRoom) { unsubscribeRoom(); unsubscribeRoom = null; }
-
-  copyInviteBtn.disabled = true;
-  startGameBtn.disabled = false;
-
-  statusEl.textContent = "Solo game ready — click Start Game.";
-  renderCards();
-}
-
-/* =========================
-   Selection + scoring
-   ========================= */
-function myTurnOnline(s) {
-  const r = getRole(roomId);
-  return s.status === "active" && s.turn === r;
-}
-
-async function onCardClick(cardId) {
-  // No players list? do nothing.
-  if (!ALL_PLAYERS.length) return;
-
-  // SOLO MODE
-  if (localMode) {
-    if (!localState || localState.status !== "active") {
-      statusEl.textContent = "Click Start Game first (Solo).";
-      return;
-    }
-    const cur = localState.turn;                    // 'p1' or 'p2'
-    const theirs = cur === "p1" ? "p2" : "p1";
-    const taken = new Set([...localState.picks.p1, ...localState.picks.p2]);
-    if (taken.has(cardId)) return;                  // already taken
-
-    localState.picks[cur].push(cardId);
-    document.querySelector(`[data-id="${cardId}"]`)?.classList.add("selected");
-
-    const done = localState.picks.p1.length >= 6 && localState.picks.p2.length >= 6;
-    if (!done) {
-      localState.turn = theirs;
-      statusEl.textContent = `Solo — Turn: ${localState.turn.toUpperCase()}`;
-      return;
-    }
-    // finish + score
-    const sum = ids => ids.map(id => ALL_PLAYERS.find(p => p.id === id)?.rating || 0).reduce((a,b)=>a+b,0);
-    const rand = () => Math.floor(Math.random()*7); // tiny luck 0..6
-    const s1 = sum(localState.picks.p1) + rand();
-    const s2 = sum(localState.picks.p2) + rand();
-    localState.scores = { player1: s1, player2: s2 };
-    localState.status = "finished";
-    p1Score.textContent = `(${s1})`; p2Score.textContent = `(${s2})`;
-    statusEl.textContent = `Finished — Winner: ${s1===s2 ? "Tie" : (s1>s2 ? "Player 1" : "Player 2")}`;
-    renderCards(new Set([...localState.picks.p1, ...localState.picks.p2]), true);
+  // Check end
+  if (teamFull(state.team1) && teamFull(state.team2)) {
+    finishGame();
+    render();
     return;
   }
 
-  // ONLINE MODE
-  if (!roomId) return alert("Create or join a room first.");
-  try {
-    const ref = roomRef(roomId);
-    const snap = await ref.get();
-    const s = snap.data();
-    if (!s || s.status !== "active") {
-      statusEl.textContent = "Wait for the host to Start Game.";
-      return;
-    }
-    if (!myTurnOnline(s)) {
-      statusEl.textContent = `Wait — it's ${s.turn.toUpperCase()}'s turn.`;
-      return;
-    }
-
-    const r = getRole(roomId);         // 'p1' | 'p2'
-    const theirs = r === "p1" ? "p2" : "p1";
-    const taken = new Set([...(s.picks?.p1 || []), ...(s.picks?.p2 || [])]);
-    if (taken.has(cardId)) return;
-
-    const nextPicks = { p1: [...(s.picks?.p1||[])], p2: [...(s.picks?.p2||[])] };
-    nextPicks[r].push(cardId);
-
-    const p1Count = nextPicks.p1.length;
-    const p2Count = nextPicks.p2.length;
-    const done = p1Count >= 6 && p2Count >= 6;
-
-    if (!done) {
-      await ref.update({ picks: nextPicks, turn: theirs, updated: Date.now() });
-      // Optimistic UI
-      document.querySelector(`[data-id="${cardId}"]`)?.classList.add("selected");
-      statusEl.textContent = `Picked. Turn → ${theirs.toUpperCase()}`;
-    } else {
-      const sum = ids => ids.map(id => ALL_PLAYERS.find(p => p.id === id)?.rating || 0).reduce((a,b)=>a+b,0);
-      const rand = () => Math.floor(Math.random()*7);
-      const scoreP1 = sum(nextPicks.p1) + rand();
-      const scoreP2 = sum(nextPicks.p2) + rand();
-      await ref.update({
-        picks: nextPicks,
-        status: "finished",
-        scores: { player1: scoreP1, player2: scoreP2 },
-        updated: Date.now()
-      });
-      document.querySelector(`[data-id="${cardId}"]`)?.classList.add("selected");
-    }
-  } catch (e) {
-    error("[ROOM ERROR] onCardClick:", e);
-    alert("Action failed. Check Firestore rules/quotas.");
-  }
+  // Next turn
+  state.turn = state.turn === 1 ? 2 : 1;
+  rollCountry(state.turn);
+  render();
 }
 
-/* =========================
-   Wire buttons + boot
-   ========================= */
-createRoomBtn.onclick = createRoom;
-copyInviteBtn.onclick  = copyInvite;
-soloGameBtn.onclick    = bootSoloGame;
-startGameBtn.onclick   = startGame;
+function useSkip() {
+  if (state.over) return;
+  const t = state.turn === 1 ? state.team1 : state.team2;
+  if (t.skips <= 0) return;
+  t.skips -= 1;
+  rollCountry(state.turn); // tries to avoid same
+  render();
+}
 
-// First render & attach (does nothing if no room)
-renderCards();
-autoAttachOrCreate();
+function average(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+function computeScore(team){
+  const g = average(team.GK.map(p=>p.rating));
+  const d = average(team.DEF.map(p=>p.rating));
+  const m = average(team.MID.map(p=>p.rating));
+  const f = average(team.FWD.map(p=>p.rating));
+  const base = 0.15*g + 0.20*d + 0.30*m + 0.35*f;
+  const luck = (Math.random()*6)-3; // ±3
+  const final = Math.max(0, Math.min(100, base + luck));
+  return { base:+base.toFixed(2), luck:+luck.toFixed(2), final:+final.toFixed(2) };
+}
+function finishGame(){
+  const s1 = computeScore(state.team1);
+  const s2 = computeScore(state.team2);
+  let w = s1.final > s2.final ? 1 : (s2.final > s1.final ? 2 : (Math.random()<0.5?1:2));
+  state.scores = { p1: s1, p2: s2, winner: w };
+  state.over = true;
+}
+
+function slotHtml(team){
+  const n = needs(team);
+  const html = [];
+  ORDER.forEach(pos=>{
+    const rows = [];
+    for (let i=0;i<POS_LIMITS[pos];i++){
+      const cell = team[pos][i]
+        ? `<div class="picked">${team[pos][i].name} <span class="muted">(${team[pos][i].country})</span></div>`
+        : `<div class="empty">Empty slot</div>`;
+      rows.push(`<div>${cell}</div>`);
+    }
+    const needTxt = n[pos]>0 ? `<div class="muted" style="margin-top:4px">Need ${n[pos]} more</div>` : "";
+    html.push(`<div class="slot"><div class="slot-title">${pos}</div>${rows.join("")}${needTxt}</div>`);
+  });
+  return html.join("");
+}
+
+function renderEligible(){
+  const team = state.turn === 1 ? state.team1 : state.team2;
+  const list = eligibleFor(state.currentCountry, team, state.pickedIds);
+  els.list.innerHTML = "";
+
+  if (!state.currentCountry){
+    els.eligNote.textContent = "No eligible players for the last country — try Skip.";
+    return;
+  }
+  if (list.length === 0){
+    els.eligNote.textContent = "No eligible players — try Skip.";
+    return;
+  }
+  els.eligNote.textContent = "";
+
+  list.forEach(p=>{
+    const div = document.createElement("div");
+    div.className = "player";
+    div.innerHTML = `<div><strong>${p.name}</strong></div>
+                     <div class="muted">${p.country} • ${p.position}</div>`;
+    div.onclick = ()=>pickPlayer(p);
+    els.list.appendChild(div);
+  });
+}
+
+function renderChips(){
+  els.firstPickerChip.textContent = `First picker: ${state.firstPicker ?? "—"}`;
+  els.turnChip.textContent = `Turn: ${state.over ? "—" : "Player " + state.turn}`;
+  els.countryChip.textContent = `Country: ${state.currentCountry ?? "—"}`;
+  els.countryBadge.textContent = state.currentCountry ?? "—";
+  els.p1Skips.textContent = state.team1.skips;
+  els.p2Skips.textContent = state.team2.skips;
+  els.skipBtn.disabled = state.over || (state.turn===1 ? state.team1.skips===0 : state.team2.skips===0);
+}
+
+function renderTeams(){
+  els.team1Grid.innerHTML = slotHtml(state.team1);
+  els.team2Grid.innerHTML = slotHtml(state.team2);
+}
+
+function renderResult(){
+  if (!state.over){ els.resultPanel.style.display="none"; return; }
+  els.resultPanel.style.display="block";
+  const { p1, p2, winner } = state.scores;
+  els.winnerRow.innerHTML = `Winner: <span class="winner">Player ${winner}</span>`;
+  els.p1Base.textContent = p1.base; els.p1Luck.textContent = p1.luck; els.p1Final.textContent = p1.final;
+  els.p2Base.textContent = p2.base; els.p2Luck.textContent = p2.luck; els.p2Final.textContent = p2.final;
+}
+
+function render(){
+  renderChips();
+  renderTeams();
+  renderEligible();
+  renderResult();
+}
+
+// Wire buttons
+els.startBtn.addEventListener("click", startGame);
+els.resetBtn.addEventListener("click", resetAll);
+els.skipBtn.addEventListener("click", useSkip);
+
+// Initial paint (idle state)
+render();
 </script>
 </body>
 </html>
-
-
