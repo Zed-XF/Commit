@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Winning Side — Local Draft</title>
+<title>Winning Side — Local + Online</title>
 <style>
   :root{--bg:#121212;--panel:#1f1f1f;--muted:#bbb;--accent:#ffd54a;--ok:#31d0aa;--warn:#ffb74d;--border:#2a2a2a;}
   *{box-sizing:border-box}
@@ -11,9 +11,11 @@
   .container{max-width:1100px;margin:auto;padding:20px}
   h1{margin:8px 0 6px;text-align:center}
   .topbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:8px 0 16px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .chip{font-size:12px;background:#222;border:1px solid var(--border);padding:6px 10px;border-radius:999px}
   .btn{border:1px solid var(--border);background:#222;color:#fff;border-radius:10px;padding:8px 12px;cursor:pointer}
   .btn.primary{background:#2a8f6a}
+  .btn.warn{background:#7c4a12}
   .btn:disabled{opacity:.5;cursor:not-allowed}
   .board{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
   .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
@@ -34,22 +36,35 @@
   .scorebox .label{font-size:12px;color:var(--muted)}
   .winner{font-weight:700;color:var(--ok)}
 </style>
+<!-- Firebase (compat, simple) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <div class="container">
   <h1>Winning Side</h1>
 
   <div class="topbar">
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <div class="row">
       <span class="chip">Six-a-side: 1 GK • 1 DEF • 2 MID • 2 FWD</span>
+      <span class="chip" id="modeChip">Mode: Offline</span>
+      <span class="chip" id="roomChip">Room: —</span>
+      <span class="chip" id="roleChip">Role: —</span>
+    </div>
+    <div class="row">
+      <label class="chip"><input type="checkbox" id="onlineToggle" /> Online</label>
+      <button id="inviteBtn" class="btn">Invite</button>
+      <button id="startBtn" class="btn primary">Start Game</button>
+      <button id="skipBtn" class="btn">Use Skip</button>
+      <button id="resetBtn" class="btn warn">Reset</button>
+    </div>
+  </div>
+
+  <div class="row" style="justify-content:space-between;margin:8px 0 4px">
+    <div class="row">
       <span class="chip" id="firstPickerChip">First picker: —</span>
       <span class="chip" id="turnChip">Turn: —</span>
       <span class="chip" id="countryChip">Country: —</span>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button id="startBtn" class="btn primary">Start Game</button>
-      <button id="skipBtn" class="btn">Use Skip</button>
-      <button id="resetBtn" class="btn">Reset</button>
     </div>
   </div>
 
@@ -100,11 +115,36 @@
 </div>
 
 <script>
-/* =========================
-   Hardcoded Players (your original list)
-   ========================= */
+/***********************
+ * CONFIG (toggle + firebase)
+ ***********************/
+const FIREBASE_ENABLED = true; // set to true after pasting your config
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyCtti9Ll57zmSXvG4RofN_yQa7y2uVCGC0",
+  authDomain: "winning-team-6364c.firebaseapp.com",
+  projectId: "winning-team-6364c",
+  storageBucket: "winning-team-6364c.firebasestorage.app",
+  messagingSenderId: "944401986892",
+  appId: "1:944401986892:web:8fad1c4d395acceed50be9",
+  measurementId: "G-B8TT9WKWEX"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+/***********************
+ * Players (same list as v2)
+ ***********************/
 const ALL_PLAYERS = [
-  // GK (16)
   { id: "yashin", name: "Lev Yashin", country: "USSR", position: "GK", rating: 97 },
   { id: "buffon", name: "Gianluigi Buffon", country: "Italy", position: "GK", rating: 94 },
   { id: "casillas", name: "Iker Casillas", country: "Spain", position: "GK", rating: 92 },
@@ -121,8 +161,6 @@ const ALL_PLAYERS = [
   { id: "valdes", name: "Víctor Valdés", country: "Spain", position: "GK", rating: 88 },
   { id: "seaman", name: "David Seaman", country: "England", position: "GK", rating: 89 },
   { id: "schwarzer", name: "Mark Schwarzer", country: "Australia", position: "GK", rating: 85 },
-
-  // DEF (32)
   { id: "maldini", name: "Paolo Maldini", country: "Italy", position: "DEF", rating: 96 },
   { id: "beckenbauer", name: "Franz Beckenbauer", country: "Germany", position: "DEF", rating: 97 },
   { id: "cafu", name: "Cafu", country: "Brazil", position: "DEF", rating: 90 },
@@ -156,8 +194,6 @@ const ALL_PLAYERS = [
   { id: "facchetti", name: "Giacinto Facchetti", country: "Italy", position: "DEF", rating: 93 },
   { id: "santamaria", name: "José Santamaría", country: "Uruguay", position: "DEF", rating: 92 },
   { id: "passarella", name: "Daniel Passarella", country: "Argentina", position: "DEF", rating: 94 },
-
-  // MID (36)
   { id: "zidane", name: "Zinedine Zidane", country: "France", position: "MID", rating: 97 },
   { id: "xavi", name: "Xavi", country: "Spain", position: "MID", rating: 95 },
   { id: "iniesta", name: "Andres Iniesta", country: "Spain", position: "MID", rating: 95 },
@@ -195,8 +231,6 @@ const ALL_PLAYERS = [
   { id: "iniesta10", name: "Hristo Stoichkov (AM)", country: "Bulgaria", position: "MID", rating: 91 },
   { id: "baggio10", name: "Roberto Baggio (AM)", country: "Italy", position: "MID", rating: 94 },
   { id: "deco", name: "Deco", country: "Portugal", position: "MID", rating: 90 },
-
-  // FWD (40+)
   { id: "pele", name: "Pelé", country: "Brazil", position: "FWD", rating: 99 },
   { id: "maradona", name: "Diego Maradona", country: "Argentina", position: "FWD", rating: 99 },
   { id: "ronaldo", name: "Ronaldo Nazário", country: "Brazil", position: "FWD", rating: 97 },
@@ -244,26 +278,17 @@ const ALL_PLAYERS = [
   { id: "greaves", name: "Jimmy Greaves", country: "England", position: "FWD", rating: 94 }
 ];
 
-/* =========================
-   Game Logic
-   ========================= */
+/***********************
+ * Game Logic (local)
+ ***********************/
 const POS_LIMITS = { GK: 1, DEF: 1, MID: 2, FWD: 2 };
 const ORDER = ["GK", "DEF", "MID", "FWD"];
 const countries = Array.from(new Set(ALL_PLAYERS.map(p => p.country))).sort();
 
-const state = {
-  team1: { GK: [], DEF: [], MID: [], FWD: [], skips: 1 },
-  team2: { GK: [], DEF: [], MID: [], FWD: [], skips: 1 },
-  pickedIds: new Set(),
-  firstPicker: null, // 1 or 2
-  turn: 1,
-  currentCountry: null,
-  lastCountry: { 1: null, 2: null },
-  over: false,
-  scores: null
-};
-
 const els = {
+  modeChip: document.getElementById("modeChip"),
+  roomChip: document.getElementById("roomChip"),
+  roleChip: document.getElementById("roleChip"),
   firstPickerChip: document.getElementById("firstPickerChip"),
   turnChip: document.getElementById("turnChip"),
   countryChip: document.getElementById("countryChip"),
@@ -277,6 +302,8 @@ const els = {
   startBtn: document.getElementById("startBtn"),
   skipBtn: document.getElementById("skipBtn"),
   resetBtn: document.getElementById("resetBtn"),
+  inviteBtn: document.getElementById("inviteBtn"),
+  onlineToggle: document.getElementById("onlineToggle"),
   resultPanel: document.getElementById("resultPanel"),
   winnerRow: document.getElementById("winnerRow"),
   p1Base: document.getElementById("p1Base"),
@@ -284,7 +311,26 @@ const els = {
   p1Final: document.getElementById("p1Final"),
   p2Base: document.getElementById("p2Base"),
   p2Luck: document.getElementById("p2Luck"),
-  p2Final: document.getElementById("p2Final")
+  p2Final: document.getElementById("p2Final"),
+};
+
+const state = {
+  // core
+  team1: { GK: [], DEF: [], MID: [], FWD: [], skips: 1 },
+  team2: { GK: [], DEF: [], MID: [], FWD: [], skips: 1 },
+  pickedIds: new Set(),
+  firstPicker: null, // 1 or 2
+  turn: 1,
+  currentCountry: null,
+  lastCountry: { 1: null, 2: null },
+  over: false,
+  scores: null,
+  // online
+  online: false,
+  roomId: null,
+  role: null, // 1=p1, 2=p2
+  unsub: null,
+  version: 0,
 };
 
 function resetAll() {
@@ -297,6 +343,7 @@ function resetAll() {
   state.lastCountry = { 1: null, 2: null };
   state.over = false;
   state.scores = null;
+  state.version = 0;
   render();
 }
 
@@ -305,104 +352,231 @@ function startGame() {
   state.firstPicker = Math.random() < 0.5 ? 1 : 2;
   state.turn = state.firstPicker;
   rollCountry(state.turn);
+  if (state.online) pushOnline();
   render();
 }
 
 function needs(team) {
-  const out = {};
-  ORDER.forEach(pos => out[pos] = Math.max(0, POS_LIMITS[pos] - team[pos].length));
-  return out;
-}
-function teamFull(team) { return ORDER.every(pos => team[pos].length === POS_LIMITS[pos]); }
-
-function eligibleFor(country, team, taken) {
+  const out = {}; ORDER.forEach(pos => out[pos] = Math.max(0, POS_LIMITS[pos] - team[pos].length));
+  return out; }
+function teamFull(team){ return ORDER.every(pos => team[pos].length === POS_LIMITS[pos]); }
+function eligibleFor(country, team, taken){
   const n = needs(team);
-  return ALL_PLAYERS.filter(p =>
-    p.country === country && !taken.has(p.id) && n[p.position] > 0
-  );
+  return ALL_PLAYERS.filter(p => p.country === country && !taken.has(p.id) && n[p.position] > 0);
 }
 
-function rollCountry(forPlayer, avoidSame=true) {
+function rollCountry(forPlayer, avoidSame=true){
   const avoid = avoidSame ? state.lastCountry[forPlayer] : null;
   let candidate = null;
-
-  // try to avoid repeating same country and ensure at least one eligible
   for (let i=0;i<60;i++){
     const c = countries[Math.floor(Math.random()*countries.length)];
-    if (avoid && c === avoid) continue;
+    if (avoid && c===avoid) continue;
     const team = forPlayer === 1 ? state.team1 : state.team2;
-    if (eligibleFor(c, team, state.pickedIds).length) { candidate = c; break; }
+    if (eligibleFor(c, team, state.pickedIds).length) { candidate=c; break; }
   }
-  // fallback any eligible
   if (!candidate){
     for (let i=0;i<60;i++){
       const c = countries[Math.floor(Math.random()*countries.length)];
       const team = forPlayer === 1 ? state.team1 : state.team2;
-      if (eligibleFor(c, team, state.pickedIds).length) { candidate = c; break; }
+      if (eligibleFor(c, team, state.pickedIds).length) { candidate=c; break; }
     }
   }
-  // last resort: random country (might be empty; UI will say try skip)
   if (!candidate) candidate = countries[Math.floor(Math.random()*countries.length)];
-
   state.currentCountry = candidate;
   state.lastCountry[forPlayer] = candidate;
 }
 
-function pickPlayer(p) {
-  if (state.over) return;
-  const team = state.turn === 1 ? state.team1 : state.team2;
-  const elig = eligibleFor(state.currentCountry, team, state.pickedIds).map(x=>x.id);
-  if (!elig.includes(p.id)) return; // guard
-
-  team[p.position].push(p);
-  state.pickedIds.add(p.id);
-
-  // Check end
-  if (teamFull(state.team1) && teamFull(state.team2)) {
-    finishGame();
-    render();
-    return;
-  }
-
-  // Next turn
-  state.turn = state.turn === 1 ? 2 : 1;
-  rollCountry(state.turn);
-  render();
-}
-
-function useSkip() {
-  if (state.over) return;
-  const t = state.turn === 1 ? state.team1 : state.team2;
-  if (t.skips <= 0) return;
-  t.skips -= 1;
-  rollCountry(state.turn); // tries to avoid same
-  render();
-}
-
 function average(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
 function computeScore(team){
-  const g = average(team.GK.map(p=>p.rating));
-  const d = average(team.DEF.map(p=>p.rating));
-  const m = average(team.MID.map(p=>p.rating));
-  const f = average(team.FWD.map(p=>p.rating));
+  const g=average(team.GK.map(p=>p.rating));
+  const d=average(team.DEF.map(p=>p.rating));
+  const m=average(team.MID.map(p=>p.rating));
+  const f=average(team.FWD.map(p=>p.rating));
   const base = 0.15*g + 0.20*d + 0.30*m + 0.35*f;
-  const luck = (Math.random()*6)-3; // ±3
+  const luck = (Math.random()*6)-3;
   const final = Math.max(0, Math.min(100, base + luck));
   return { base:+base.toFixed(2), luck:+luck.toFixed(2), final:+final.toFixed(2) };
 }
 function finishGame(){
-  const s1 = computeScore(state.team1);
-  const s2 = computeScore(state.team2);
-  let w = s1.final > s2.final ? 1 : (s2.final > s1.final ? 2 : (Math.random()<0.5?1:2));
-  state.scores = { p1: s1, p2: s2, winner: w };
-  state.over = true;
+  const s1=computeScore(state.team1); const s2=computeScore(state.team2);
+  const w = s1.final>s2.final?1:(s2.final>s1.final?2:(Math.random()<0.5?1:2));
+  state.scores = { p1:s1, p2:s2, winner:w }; state.over = true; state.version++;
 }
 
+/***********************
+ * Online helpers (Firestore, efficient)
+ * - Single document per room (small payload)
+ * - Writes only on user actions
+ * - Transaction for contested picks/skips
+ ***********************/
+const roomsCol = ()=> db.collection('matches');
+function roomRef(){ return roomsCol().doc(state.roomId); }
+
+function encode(){
+  return {
+    v: state.version,
+    team1: state.team1,
+    team2: state.team2,
+    pickedIds: Array.from(state.pickedIds),
+    firstPicker: state.firstPicker,
+    turn: state.turn,
+    currentCountry: state.currentCountry,
+    lastCountry: state.lastCountry,
+    over: state.over,
+    scores: state.scores,
+    updatedAt: Date.now(),
+  };
+}
+function decode(d){
+  state.version = d.v || 0;
+  state.team1 = d.team1; state.team2 = d.team2;
+  state.pickedIds = new Set(d.pickedIds||[]);
+  state.firstPicker = d.firstPicker; state.turn = d.turn;
+  state.currentCountry = d.currentCountry; state.lastCountry = d.lastCountry || {1:null,2:null};
+  state.over = !!d.over; state.scores = d.scores||null;
+}
+
+async function createRoom(){
+  if (!FIREBASE_ENABLED) { alert('Enable Firebase first.'); return; }
+  const id = Math.random().toString(36).slice(2,8);
+  state.roomId=id; state.role=1; state.online=true;
+  await roomsCol().doc(id).set({ participants:{ p1:true }, state: encode() });
+  updateModeChips();
+  const link = window.location.origin + window.location.pathname + `?room=${id}`;
+  try { await navigator.clipboard.writeText(link); alert('Invite link copied!'); } catch(e){ prompt('Copy invite link:', link); }
+}
+
+async function joinFromUrl(){
+  const params = new URLSearchParams(location.search); const id = params.get('room');
+  if (!id || !FIREBASE_ENABLED) return;
+  state.roomId=id; state.role=2; state.online=true; updateModeChips();
+  await roomsCol().doc(id).set({ participants:{ p2:true } }, { merge:true });
+  attachListener();
+}
+
+function attachListener(){
+  if (!state.roomId) return;
+  if (state.unsub) state.unsub();
+  state.unsub = roomRef().onSnapshot(snap=>{
+    const data = snap.data(); if (!data) return;
+    if (data.state){ decode(data.state); render(); }
+  });
+}
+
+async function pushOnline(){
+  if (!state.online || !state.roomId) return;
+  await roomRef().set({ state: encode() }, { merge:true });
+}
+
+// transactional pick to guard against collisions
+async function txPick(playerId){
+  if (!state.online) { pickPlayerLocal(playerId); return; }
+  await db.runTransaction(async(tx)=>{
+    const doc = await tx.get(roomRef());
+    const data = doc.data(); const s = data.state;
+    const picked = new Set(s.pickedIds||[]);
+    if (s.over) return; // game ended
+    if ((s.turn===1 && state.role!==1) || (s.turn===2 && state.role!==2)) return; // not your turn
+    const team = s.turn===1 ? s.team1 : s.team2;
+    const n = {}; ORDER.forEach(pos=> n[pos] = Math.max(0, POS_LIMITS[pos] - team[pos].length));
+    const p = ALL_PLAYERS.find(x=>x.id===playerId);
+    const eligible = p && p.country===s.currentCountry && !picked.has(p.id) && n[p.position]>0;
+    if (!eligible) return;
+    team[p.position] = [...team[p.position], p];
+    picked.add(p.id);
+    // end?
+    const full = ORDER.every(pos => s.team1[pos].length===POS_LIMITS[pos] && s.team2[pos].length===POS_LIMITS[pos]);
+    if (full){
+      const res = finishFromSnapshot(s);
+      s.scores = res.scores; s.over = true;
+    } else {
+      s.turn = s.turn===1?2:1;
+      // roll next country for next player, try avoid repetition
+      const forPlayer = s.turn;
+      const countriesSet = countries;
+      const last = s.lastCountry && s.lastCountry[forPlayer];
+      let candidate=null;
+      for (let i=0;i<60;i++){
+        const c = countriesSet[Math.floor(Math.random()*countriesSet.length)];
+        if (last && c===last) continue;
+        const t = forPlayer===1 ? s.team1 : s.team2;
+        const nn={}; ORDER.forEach(pos=> nn[pos]=Math.max(0, POS_LIMITS[pos]-t[pos].length));
+        const elig = ALL_PLAYERS.some(pp=> pp.country===c && !picked.has(pp.id) && nn[pp.position]>0);
+        if (elig){ candidate=c; break; }
+      }
+      if (!candidate){ candidate = countriesSet[Math.floor(Math.random()*countriesSet.length)]; }
+      s.currentCountry = candidate; s.lastCountry = s.lastCountry || {1:null,2:null}; s.lastCountry[forPlayer]=candidate;
+    }
+    s.pickedIds = Array.from(picked); s.v = (s.v||0)+1; s.updatedAt = Date.now();
+    tx.set(roomRef(), { state: s }, { merge:true });
+  });
+}
+
+function finishFromSnapshot(s){
+  function avg(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+  function teamScore(t){
+    const g=avg(t.GK.map(p=>p.rating)); const d=avg(t.DEF.map(p=>p.rating));
+    const m=avg(t.MID.map(p=>p.rating)); const f=avg(t.FWD.map(p=>p.rating));
+    const base = 0.15*g+0.20*d+0.30*m+0.35*f; const luck=(Math.random()*6)-3;
+    const final=Math.max(0,Math.min(100,base+luck));
+    return { base:+base.toFixed(2), luck:+luck.toFixed(2), final:+final.toFixed(2) };
+  }
+  const s1=teamScore(s.team1), s2=teamScore(s.team2);
+  const w = s1.final>s2.final?1:(s2.final>s1.final?2:(Math.random()<0.5?1:2));
+  return { scores:{ p1:s1, p2:s2, winner:w } };
+}
+
+async function txSkip(){
+  if (!state.online) { useSkipLocal(); return; }
+  await db.runTransaction(async(tx)=>{
+    const doc = await tx.get(roomRef()); const s = doc.data().state;
+    if (s.over) return; if ((s.turn===1 && state.role!==1) || (s.turn===2 && state.role!==2)) return;
+    const t = s.turn===1 ? s.team1 : s.team2;
+    if (t.skips<=0) return; t.skips -= 1;
+    // reroll for same player (avoid same)
+    const last = s.lastCountry && s.lastCountry[s.turn];
+    let candidate=null; const picked = new Set(s.pickedIds||[]);
+    for (let i=0;i<60;i++){
+      const c = countries[Math.floor(Math.random()*countries.length)];
+      if (last && c===last) continue;
+      const team = s.turn===1 ? s.team1 : s.team2;
+      const nn={}; ORDER.forEach(pos=> nn[pos]=Math.max(0, POS_LIMITS[pos]-team[pos].length));
+      const elig = ALL_PLAYERS.some(pp=> pp.country===c && !picked.has(pp.id) && nn[pp.position]>0);
+      if (elig){ candidate=c; break; }
+    }
+    if (!candidate) candidate = countries[Math.floor(Math.random()*countries.length)];
+    s.currentCountry=candidate; s.lastCountry = s.lastCountry || {1:null,2:null}; s.lastCountry[s.turn]=candidate; s.v=(s.v||0)+1; s.updatedAt=Date.now();
+    tx.set(roomRef(), { state: s }, { merge:true });
+  });
+}
+
+/***********************
+ * Local actions (offline or optimistic UI)
+ ***********************/
+function pickPlayerLocal(playerId){
+  if (state.over) return;
+  const team = state.turn===1 ? state.team1 : state.team2;
+  const eligibleIds = eligibleFor(state.currentCountry, team, state.pickedIds).map(x=>x.id);
+  if (!eligibleIds.includes(playerId)) return;
+  const p = ALL_PLAYERS.find(x=>x.id===playerId);
+  team[p.position].push(p); state.pickedIds.add(p.id);
+
+  if (teamFull(state.team1) && teamFull(state.team2)) { finishGame(); render(); if (state.online) pushOnline(); return; }
+  state.turn = state.turn===1?2:1; rollCountry(state.turn); state.version++; render(); if (state.online) pushOnline();
+}
+
+function useSkipLocal(){
+  if (state.over) return; const t = state.turn===1 ? state.team1 : state.team2; if (t.skips<=0) return;
+  t.skips -= 1; rollCountry(state.turn); state.version++; render(); if (state.online) pushOnline();
+}
+
+/***********************
+ * UI Rendering
+ ***********************/
 function slotHtml(team){
-  const n = needs(team);
-  const html = [];
+  const n = needs(team); const html=[];
   ORDER.forEach(pos=>{
-    const rows = [];
+    const rows=[];
     for (let i=0;i<POS_LIMITS[pos];i++){
       const cell = team[pos][i]
         ? `<div class="picked">${team[pos][i].name} <span class="muted">(${team[pos][i].country})</span></div>`
@@ -416,38 +590,34 @@ function slotHtml(team){
 }
 
 function renderEligible(){
-  const team = state.turn === 1 ? state.team1 : state.team2;
-  const list = eligibleFor(state.currentCountry, team, state.pickedIds);
-  els.list.innerHTML = "";
-
-  if (!state.currentCountry){
-    els.eligNote.textContent = "No eligible players for the last country — try Skip.";
-    return;
-  }
-  if (list.length === 0){
-    els.eligNote.textContent = "No eligible players — try Skip.";
-    return;
-  }
+  const team = state.turn===1 ? state.team1 : state.team2;
+  const list = state.currentCountry ? eligibleFor(state.currentCountry, team, state.pickedIds) : [];
+  els.list.innerHTML="";
+  if (!state.currentCountry){ els.eligNote.textContent = "No eligible players for the last country — try Skip."; return; }
+  if (list.length===0){ els.eligNote.textContent = "No eligible players — try Skip."; return; }
   els.eligNote.textContent = "";
-
   list.forEach(p=>{
-    const div = document.createElement("div");
-    div.className = "player";
-    div.innerHTML = `<div><strong>${p.name}</strong></div>
-                     <div class="muted">${p.country} • ${p.position}</div>`;
-    div.onclick = ()=>pickPlayer(p);
+    const div=document.createElement('div'); div.className='player';
+    div.innerHTML = `<div><strong>${p.name}</strong></div><div class="muted">${p.country} • ${p.position}</div>`;
+    div.onclick = ()=> state.online ? txPick(p.id) : pickPlayerLocal(p.id);
     els.list.appendChild(div);
   });
 }
 
+function updateModeChips(){
+  els.modeChip.textContent = `Mode: ${state.online? 'Online' : 'Offline'}`;
+  els.roomChip.textContent = `Room: ${state.roomId || '—'}`;
+  els.roleChip.textContent = `Role: ${state.role ? 'Player '+state.role : '—'}`;
+}
+
 function renderChips(){
-  els.firstPickerChip.textContent = `First picker: ${state.firstPicker ?? "—"}`;
-  els.turnChip.textContent = `Turn: ${state.over ? "—" : "Player " + state.turn}`;
-  els.countryChip.textContent = `Country: ${state.currentCountry ?? "—"}`;
-  els.countryBadge.textContent = state.currentCountry ?? "—";
-  els.p1Skips.textContent = state.team1.skips;
-  els.p2Skips.textContent = state.team2.skips;
+  els.firstPickerChip.textContent = `First picker: ${state.firstPicker ?? '—'}`;
+  els.turnChip.textContent = `Turn: ${state.over ? '—' : 'Player ' + state.turn}`;
+  els.countryChip.textContent = `Country: ${state.currentCountry ?? '—'}`;
+  els.countryBadge.textContent = state.currentCountry ?? '—';
+  els.p1Skips.textContent = state.team1.skips; els.p2Skips.textContent = state.team2.skips;
   els.skipBtn.disabled = state.over || (state.turn===1 ? state.team1.skips===0 : state.team2.skips===0);
+  updateModeChips();
 }
 
 function renderTeams(){
@@ -456,28 +626,50 @@ function renderTeams(){
 }
 
 function renderResult(){
-  if (!state.over){ els.resultPanel.style.display="none"; return; }
-  els.resultPanel.style.display="block";
+  if (!state.over){ els.resultPanel.style.display='none'; return; }
+  els.resultPanel.style.display='block';
   const { p1, p2, winner } = state.scores;
   els.winnerRow.innerHTML = `Winner: <span class="winner">Player ${winner}</span>`;
-  els.p1Base.textContent = p1.base; els.p1Luck.textContent = p1.luck; els.p1Final.textContent = p1.final;
-  els.p2Base.textContent = p2.base; els.p2Luck.textContent = p2.luck; els.p2Final.textContent = p2.final;
+  els.p1Base.textContent=p1.base; els.p1Luck.textContent=p1.luck; els.p1Final.textContent=p1.final;
+  els.p2Base.textContent=p2.base; els.p2Luck.textContent=p2.luck; els.p2Final.textContent=p2.final;
 }
 
 function render(){
-  renderChips();
-  renderTeams();
-  renderEligible();
-  renderResult();
+  renderChips(); renderTeams(); renderEligible(); renderResult();
 }
 
-// Wire buttons
-els.startBtn.addEventListener("click", startGame);
-els.resetBtn.addEventListener("click", resetAll);
-els.skipBtn.addEventListener("click", useSkip);
+/***********************
+ * Wire buttons
+ ***********************/
+els.startBtn.addEventListener('click', ()=>{
+  if (state.online && !state.roomId){ createRoom().then(()=>{ startGame(); attachListener(); }); }
+  else { startGame(); if (state.online) attachListener(); }
+});
 
-// Initial paint (idle state)
-render();
+els.resetBtn.addEventListener('click', ()=>{ resetAll(); if (state.online) pushOnline(); });
+els.skipBtn.addEventListener('click', ()=> state.online ? txSkip() : useSkipLocal());
+
+els.inviteBtn.addEventListener('click', ()=>{
+  if (!state.online){
+    if (!FIREBASE_ENABLED){ alert('Enable Firebase to invite.'); return; }
+    createRoom(); attachListener();
+  } else if (state.roomId){
+    const link = window.location.origin + window.location.pathname + `?room=${state.roomId}`;
+    navigator.clipboard?.writeText(link).then(()=> alert('Invite link copied!')).catch(()=> prompt('Copy link:', link));
+  }
+});
+
+els.onlineToggle.addEventListener('change', (e)=>{
+  state.online = !!e.target.checked;
+  if (!state.online){ state.roomId=null; state.role=null; if (state.unsub){ state.unsub(); state.unsub=null; } }
+  updateModeChips();
+});
+
+// On load: auto-join if ?room= present
+(async function init(){
+  render();
+  if (FIREBASE_ENABLED) { await joinFromUrl(); }
+})();
 </script>
 </body>
 </html>
