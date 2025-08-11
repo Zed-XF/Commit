@@ -4,16 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Winning Side — Standalone</title>
-
-    <!-- Tailwind (CDN) for quick styling -->
+    <!-- Tailwind via CDN (for quick testing) -->
     <script src="https://cdn.tailwindcss.com"></script>
-
-    <!-- React 18 + Babel (compile JSX in browser – OK for MVP) -->
+    <!-- React 18 + Babel for in-browser JSX transpile (dev only) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-    <!-- Firebase compat (simplest for single-file app) -->
+    <!-- Firebase compat (simplest for single-file hosting) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   </head>
@@ -24,9 +21,7 @@
       const { useMemo, useState, useEffect } = React;
 
       // === Brand & Realtime Config ===
-      const LOGO_URL = "https://dummyimage.com/160x40/059669/ffffff&text=Winning+Side"; // replace with your logo url
-
-      // Firebase: ENABLED with your config
+      const LOGO_URL = "https://dummyimage.com/160x40/059669/ffffff&text=Winning+Side"; // swap with your logo URL
       const FIREBASE_ENABLED = true;
       const FIREBASE_CONFIG = {
         apiKey: "AIzaSyCtti9Ll57zmSXvG4RofN_yQa7y2uVCGC0",
@@ -38,7 +33,7 @@
         measurementId: "G-B8TT9WKWEX"
       };
 
-      // ===== Players (retired) – ~120 total =====
+      // ===== Players (retired) =====
       const ALL_PLAYERS = [
         // GK (16)
         { id: "yashin", name: "Lev Yashin", country: "USSR", position: "GK", rating: 97 },
@@ -128,9 +123,9 @@
         { id: "sammer", name: "Matthias Sammer", country: "Germany", position: "MID", rating: 91 },
         { id: "keane", name: "Roy Keane", country: "Ireland", position: "MID", rating: 90 },
         { id: "veron", name: "Juan Sebastián Verón", country: "Argentina", position: "MID", rating: 90 },
+        { id: "iniesta10", name: "Hristo Stoichkov (AM)", country: "Bulgaria", position: "MID", rating: 91 },
+        { id: "baggio10", name: "Roberto Baggio (AM)", country: "Italy", position: "MID", rating: 94 },
         { id: "deco", name: "Deco", country: "Portugal", position: "MID", rating: 90 },
-        { id: "hagi", name: "Gheorghe Hagi", country: "Romania", position: "MID", rating: 92 },
-        { id: "zidane2", name: "Zvonimir Boban", country: "Croatia", position: "MID", rating: 90 },
 
         // FWD (40+)
         { id: "pele", name: "Pelé", country: "Brazil", position: "FWD", rating: 99 },
@@ -159,6 +154,8 @@
         { id: "owen", name: "Michael Owen", country: "England", position: "FWD", rating: 90 },
         { id: "etoo", name: "Samuel Eto'o", country: "Cameroon", position: "FWD", rating: 93 },
         { id: "zlatan", name: "Zlatan Ibrahimović", country: "Sweden", position: "FWD", rating: 92 },
+        { id: "ronaldinhoF", name: "Ronaldinho (FWD)", country: "Brazil", position: "FWD", rating: 94 },
+        { id: "rivaldoF", name: "Rivaldo (FWD)", country: "Brazil", position: "FWD", rating: 93 },
         { id: "klose", name: "Miroslav Klose", country: "Germany", position: "FWD", rating: 91 },
         { id: "crespo", name: "Hernán Crespo", country: "Argentina", position: "FWD", rating: 91 },
         { id: "aguero", name: "Sergio Agüero", country: "Argentina", position: "FWD", rating: 92 },
@@ -179,8 +176,7 @@
       ];
 
       const POS_LIMITS = { GK: 1, DEF: 1, MID: 2, FWD: 2 };
-      const POSITION_ORDER = ["GK", "DEF", "MID", "FWD"];
-
+      const POSITION_ORDER = ["GK", "DEF", "MID", "FWD"]; // display order
       const cloneTeam = () => ({ GK: [], DEF: [], MID: [], FWD: [], skipsLeft: 1 });
       const getCountriesFrom = (players) => Array.from(new Set(players.map(p => p.country))).sort();
 
@@ -194,18 +190,19 @@
         const needs = teamNeeds(team);
         return POSITION_ORDER.every(pos => needs[pos] === 0);
       }
-      function eligiblePlayersForTeam(players, country, team, pickedIds) {
+      function eligiblePlayersForTeam(players, country, team, alreadyPickedIds) {
         const needs = teamNeeds(team);
-        return players.filter(p => p.country === country && !pickedIds.has(p.id) && needs[p.position] > 0);
+        return players.filter(p => p.country === country && !alreadyPickedIds.has(p.id) && needs[p.position] > 0);
       }
       const average = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
       function computeTeamScore(team) {
+        // GK 15%, DEF 20%, MID 30%, FWD 35% + luck (±3)
         const gkAvg = average(team.GK.map(p => p.rating));
         const defAvg = average(team.DEF.map(p => p.rating));
         const midAvg = average(team.MID.map(p => p.rating));
         const fwdAvg = average(team.FWD.map(p => p.rating));
         const base = 0.15 * gkAvg + 0.20 * defAvg + 0.30 * midAvg + 0.35 * fwdAvg;
-        const luck = (Math.random() * 6) - 3; // [-3,+3]
+        const luck = (Math.random() * 6) - 3;
         const score = Math.max(0, Math.min(100, base + luck));
         return { base: Number(base.toFixed(2)), luck: Number(luck.toFixed(2)), final: Number(score.toFixed(2)) };
       }
@@ -228,7 +225,9 @@
                       )}
                     </div>
                   ))}
-                  {needs[pos] > 0 && <div className="text-[11px] text-amber-700 mt-1">Need {needs[pos]} more</div>}
+                  {needs[pos] > 0 && (
+                    <div className="text-[11px] text-amber-700 mt-1">Need {needs[pos]} more</div>
+                  )}
                 </div>
               ))}
             </div>
@@ -240,25 +239,34 @@
       const CountryBadge = ({ country }) => (
         <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-medium">{country}</span>
       );
-      const PlayerCard = ({ p, onPick }) => (
-        <button onClick={() => onPick(p)} className="w-full text-left border rounded-xl p-3 hover:shadow transition">
+
+      // Turn-lockable card
+      const PlayerCard = ({ p, onPick, disabled }) => (
+        <button
+          onClick={() => !disabled && onPick(p)}
+          disabled={disabled}
+          className={"w-full text-left border rounded-xl p-3 hover:shadow transition " + (disabled ? "opacity-50 cursor-not-allowed hover:shadow-none" : "")}
+        >
           <div className="font-medium">{p.name}</div>
           <div className="text-xs text-gray-600">{p.country}</div>
         </button>
       );
+
       const Divider = () => <div className="h-px bg-gray-200 my-4" />;
 
       function App() {
-        // Firebase init (compat) – only if enabled
+        // Firebase init
         useEffect(() => {
           if (FIREBASE_ENABLED) {
             if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
           }
         }, []);
 
+        const roomFromUrl = new URLSearchParams(window.location.search).get('room') || null;
+
+        // Core state
         const [players] = useState(ALL_PLAYERS);
         const [countries] = useState(getCountriesFrom(players));
-
         const [team1, setTeam1] = useState(cloneTeam());
         const [team2, setTeam2] = useState(cloneTeam());
         const [pickedIds, setPickedIds] = useState(new Set());
@@ -268,18 +276,11 @@
         const [winner, setWinner] = useState(null);
         const [scores, setScores] = useState(null);
 
-        // online state
-        const roomFromUrl = new URLSearchParams(window.location.search).get('room') || null;
+        // Online state
         const [roomId, setRoomId] = useState(roomFromUrl);
-        const [isOnline, setIsOnline] = useState(false);
-        const [role, setRole] = useState(null); // 'p1' or 'p2'
-
-        useEffect(() => {
-          if (FIREBASE_ENABLED && roomFromUrl) {
-            setIsOnline(true);
-            setRole('p2');
-          }
-        }, []);
+        const [isOnline, setIsOnline] = useState(!!roomFromUrl);
+        const [role, setRole] = useState(roomFromUrl ? 'p2' : null); // inviter will be p1
+        const [receivedRemote, setReceivedRemote] = useState(false); // guard to avoid P2 overwriting P1
 
         useEffect(() => { newMatch(); }, []);
 
@@ -329,7 +330,7 @@
           const newPicked = new Set(pickedIds); newPicked.add(player.id); setPickedIds(newPicked);
         }
 
-        // ---------- Online (Firestore) ----------
+        // ---------- Online helpers ----------
         async function createRoom() {
           if (!FIREBASE_ENABLED) { alert('Enable Firebase config first.'); return; }
           const id = Math.random().toString(36).slice(2, 8);
@@ -341,19 +342,23 @@
           navigator.clipboard?.writeText(link);
           alert('Invite link copied to clipboard!');
         }
+
         function inviteFlow() {
-          const link = window.location.origin + window.location.pathname + `?room=${roomId || ""}`;
           if (roomId) {
+            const link = window.location.origin + window.location.pathname + `?room=${roomId}`;
             navigator.clipboard?.writeText(link);
             alert('Invite link copied!');
           } else {
             createRoom();
           }
         }
+
         async function syncOnline(state) {
           if (!FIREBASE_ENABLED || !roomId) return;
           await firebase.firestore().collection('matches').doc(roomId).set({ state, updatedAt: Date.now() }, { merge: true });
         }
+
+        // Listen for remote state
         useEffect(() => {
           if (!FIREBASE_ENABLED || !roomId) return;
           const ref = firebase.firestore().collection('matches').doc(roomId);
@@ -364,20 +369,22 @@
             setTeam1(s.team1); setTeam2(s.team2); setPickedIds(new Set(s.pickedIds));
             setFirstPicker(s.firstPicker); setTurn(s.turn); setCurrentCountry(s.currentCountry);
             setWinner(s.winner); setScores(s.scores);
+            setReceivedRemote(true);
           });
           return () => unsub();
         }, [roomId]);
 
-        // after local state changes, push online
+        // Push local changes online (guarded so P2 waits for first remote)
         useEffect(() => {
           if (!FIREBASE_ENABLED || !roomId) return;
+          if (role === 'p2' && !receivedRemote) return;
           const snapshot = {
             team1, team2,
             pickedIds: Array.from(pickedIds),
             firstPicker, turn, currentCountry, winner, scores
           };
           syncOnline(snapshot);
-        }, [team1, team2, pickedIds, firstPicker, turn, currentCountry, winner, scores, roomId]);
+        }, [team1, team2, pickedIds, firstPicker, turn, currentCountry, winner, scores, roomId, role, receivedRemote]);
 
         function handlePick(p) {
           addPlayerToTeam(turn, p);
@@ -401,6 +408,7 @@
         }
 
         const gameOver = winner !== null;
+        const itIsMyTurn = !isOnline || (role === 'p1' && turn === 1) || (role === 'p2' && turn === 2);
 
         return (
           <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-8">
@@ -411,8 +419,24 @@
                   <h1 className="text-2xl md:text-3xl font-bold text-emerald-700">Winning Side — Prototype</h1>
                 </div>
                 <div className="flex items-center gap-2">
+                  {FIREBASE_ENABLED && (
+                    <span
+                      className={
+                        "px-2 py-1 rounded-full text-xs " +
+                        (roomId
+                          ? ((receivedRemote || role === 'p1') ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800")
+                          : "bg-gray-100 text-gray-700")
+                      }
+                    >
+                      {roomId
+                        ? ((receivedRemote || role === 'p1') ? `Room ${roomId}: Connected` : `Room ${roomId}: Waiting`)
+                        : "Offline"}
+                    </span>
+                  )}
                   <button id="inviteBtn" className="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm" onClick={inviteFlow}>Invite</button>
-                  <button onClick={newMatch} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm shadow">New Match</button>
+                  <button onClick={newMatch} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm shadow">
+                    New Match
+                  </button>
                 </div>
               </header>
 
@@ -429,7 +453,9 @@
                     <div className="text-sm">First picker: <span className="font-semibold">Player {firstPicker}</span></div>
                     <div className="text-sm">Current turn: <span className="font-semibold">Player {turn}</span></div>
                     {currentCountry && <div className="text-sm flex items-center gap-2">Country: <CountryBadge country={currentCountry} /></div>}
-                    {FIREBASE_ENABLED && roomId && <div className="text-xs text-gray-500">Room: {roomId} ({role || 'local'})</div>}
+                    {FIREBASE_ENABLED && isOnline && !itIsMyTurn && (
+                      <div className="text-xs text-amber-700">It's Player {turn}'s turn — you're locked until they pick.</div>
+                    )}
                   </div>
 
                   {!currentCountry && (
@@ -448,7 +474,12 @@
                       <div className="text-sm text-gray-500">No eligible players for this country and your remaining positions. Try Skip.</div>
                     )}
                     {eligibleList.map(p => (
-                      <PlayerCard key={p.id} p={p} onPick={handlePick} />
+                      <PlayerCard
+                        key={p.id}
+                        p={p}
+                        onPick={handlePick}
+                        disabled={!itIsMyTurn}
+                      />
                     ))}
                   </div>
 
