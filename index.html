@@ -8,12 +8,12 @@
     <!-- Tailwind (quick styling) -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- React 18 + Babel (dev compile of JSX) -->
+    <!-- React 18 + Babel (dev JSX compile) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Firebase compat (simplest for one-file hosting) -->
+    <!-- Firebase compat -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   </head>
@@ -21,7 +21,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-      const { useMemo, useState, useEffect } = React;
+      const { useMemo, useState, useEffect, useRef } = React;
 
       // === Brand & Firebase ===
       const LOGO_URL = "https://dummyimage.com/160x40/059669/ffffff&text=Winning+Side";
@@ -259,8 +259,15 @@
           }
         }, []);
 
-        // Room / role
+        // Room from URL
         const roomFromUrl = new URLSearchParams(window.location.search).get('room') || null;
+
+        // Role persistence
+        function loadInitialRole(roomId) {
+          if (!roomId) return null;
+          const stored = localStorage.getItem(`ws_role_${roomId}`);
+          return stored || 'p2'; // default for joiners
+        }
 
         // Core state
         const [players] = useState(ALL_PLAYERS);
@@ -277,9 +284,17 @@
         // Online state
         const [roomId, setRoomId] = useState(roomFromUrl);
         const [isOnline, setIsOnline] = useState(!!roomFromUrl);
-        const [role, setRole] = useState(roomFromUrl ? 'p2' : null); // inviter will be p1
+        const [role, setRole] = useState(loadInitialRole(roomFromUrl)); // 'p1' or 'p2'
         const [receivedRemote, setReceivedRemote] = useState(false);
         const [lastCountry, setLastCountry] = useState({ 1: null, 2: null });
+        const lastWriteAt = useRef(0); // throttle
+
+        // If a joiner opens for the first time, remember p2
+        useEffect(() => {
+          if (roomId && !localStorage.getItem(`ws_role_${roomId}`) && role === 'p2') {
+            localStorage.setItem(`ws_role_${roomId}`, 'p2');
+          }
+        }, [roomId, role]);
 
         // Helpers bound to state
         const currentTeamRef = (which) => (which === 1 ? team1 : team2);
@@ -297,7 +312,6 @@
             const eligible = eligiblePlayersForTeam(players, c, currentTeamRef(forPlayer), pickedIds);
             if (eligible.length > 0) { chosen = c; break; }
           }
-          // fallback if avoidance blocks everything
           if (!chosen) {
             for (let i = 0; i < maxAttempts; i++) {
               const c = countries[Math.floor(Math.random() * countries.length)];
@@ -305,14 +319,13 @@
               if (eligible.length > 0) { chosen = c; break; }
             }
           }
-          // final fallback
           if (!chosen) chosen = countries[Math.floor(Math.random() * countries.length)];
 
           setCurrentCountry(chosen);
           setLastCountry(prev => ({ ...prev, [forPlayer]: chosen }));
         }
 
-        // Start a match (host or offline)
+        // Start a match
         function startFreshMatch() {
           setTeam1(cloneTeam());
           setTeam2(cloneTeam());
@@ -326,11 +339,37 @@
           rollCountry(coin);
         }
 
-        // First load: if offline, start immediately. If joined via room, wait for remote state.
+        // First load: if offline, start immediately. If online & joiner, wait for host state.
         useEffect(() => {
           if (!isOnline) startFreshMatch();
-          // if online & P2, do nothing until host sends state
         }, [isOnline]);
+
+        // Publish (current-turn only, throttled; joiner waits for first snapshot)
+        function publish(force = false) {
+          if (!FIREBASE_ENABLED || !roomId) return;
+
+          // Prevent joiner from overwriting before receiving initial host state
+          if (!force && role === 'p2' && !receivedRemote) return;
+
+          // Only the player whose turn it is writes (unless force)
+          const iAmTurn =
+            (role === 'p1' && turn === 1) ||
+            (role === 'p2' && turn === 2);
+
+          if (!force && !iAmTurn) return;
+
+          const now = Date.now();
+          if (now - lastWriteAt.current < 250) return; // throttle
+          lastWriteAt.current = now;
+
+          const snapshot = {
+            team1, team2,
+            pickedIds: Array.from(pickedIds),
+            firstPicker, turn, currentCountry, winner, scores
+          };
+          firebase.firestore().collection('matches').doc(roomId)
+            .set({ state: snapshot, updatedAt: now }, { merge: true });
+        }
 
         // Skip (forces a different country when possible)
         function useSkip() {
@@ -339,7 +378,7 @@
           const updated = { ...t, skipsLeft: t.skipsLeft - 1 };
           setCurrentTeam(turn, updated);
           rollCountry(turn, currentCountry);
-          setTimeout(publish, 0);
+          setTimeout(() => publish(false), 0);
         }
 
         // Picking
@@ -362,38 +401,21 @@
             setScores({ p1: s1, p2: s2 });
             setWinner(w);
             setCurrentCountry(null);
+            setTimeout(() => publish(false), 0);
             return;
           }
 
           const nextTurn = turn === 1 ? 2 : 1;
           setTurn(nextTurn);
           setTimeout(() => rollCountry(nextTurn), 50);
+          setTimeout(() => publish(false), 0);
         }
-        // after setTurn(nextTurn); and setTimeout(() => rollCountry(nextTurn), 50);
-          setTimeout(publish, 0);
 
         // Eligible list
         const eligibleList = useMemo(() => {
           if (!currentCountry) return [];
           return eligiblePlayersForTeam(players, currentCountry, currentTeamRef(turn), pickedIds);
         }, [players, currentCountry, team1, team2, pickedIds, turn]);
-
-        let lastWriteAt = 0;
-        function publish() {
-          if (!FIREBASE_ENABLED || !roomId) return;
-          if (role !== 'p1') return; // host-only writes
-          const now = Date.now();
-          if (now - lastWriteAt < 250) return; // throttle
-          lastWriteAt = now;
-          const snapshot = {
-            team1, team2,
-            pickedIds: Array.from(pickedIds),
-            firstPicker, turn, currentCountry, winner, scores
-          };
-          firebase.firestore().collection('matches').doc(roomId)
-            .set({ state: snapshot, updatedAt: now }, { merge: true });
-        }
-
 
         // ----- Online: create / invite / sync -----
         async function createRoom() {
@@ -402,11 +424,11 @@
           await firebase.firestore().collection('matches').doc(id).set({ state: null, updatedAt: Date.now() });
           setRoomId(id);
           setRole('p1');
+          localStorage.setItem(`ws_role_${id}`, 'p1'); // persist host role
           setIsOnline(true);
           history.replaceState(null, "", `?room=${id}`); // keep URL
-          // host starts a fresh match and syncs
-          startFreshMatch();
-          setTimeout(publish, 0);
+          startFreshMatch();            // host starts fresh
+          setTimeout(() => publish(true), 0); // force initial snapshot
           const link = window.location.origin + window.location.pathname + `?room=${id}`;
           navigator.clipboard?.writeText(link);
           alert('Invite link copied to clipboard!');
@@ -420,11 +442,6 @@
           } else {
             createRoom();
           }
-        }
-
-        async function syncOnline(state) {
-          if (!FIREBASE_ENABLED || !roomId) return;
-          await firebase.firestore().collection('matches').doc(roomId).set({ state, updatedAt: Date.now() }, { merge: true });
         }
 
         // Listen for remote updates (both host & joiner)
@@ -444,15 +461,14 @@
           return () => unsub();
         }, [roomId]);
 
-        // New Match: only host (P1) controls in online mode; anyone offline can use it
+        // New Match: anyone offline can use it; online → only host controls
         function newMatch() {
           if (isOnline && role !== 'p1') {
             alert("Only the host (Player 1) can start a new match in this room.");
             return;
           }
-          startFreshMatch(); // host will auto-sync via effect
-          setTimeout(publish, 0);
-
+          startFreshMatch();
+          setTimeout(() => publish(true), 0);
         }
 
         const gameOver = winner !== null;
@@ -577,4 +593,3 @@
     </script>
   </body>
 </html>
-
